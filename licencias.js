@@ -34,7 +34,7 @@
   if (window.OSTIKEC_LICENCIAS) return;
 
   /* --- Constantes --- */
-  const URL_LICENCIAS     = 'https://tito-corrioso.github.io/ostikec/licencias.json';
+  const URL_LICENCIAS     = 'https://osticor-pulsofinanciero.github.io/ostikec/licencias.json';
   const CLAVE_CACHE       = 'ostikec_licencias_cache';
   const CLAVE_ULTIMA_SYNC = 'ostikec_licencias_last_sync';
   const HORAS_ENTRE_SYNC  = 1;
