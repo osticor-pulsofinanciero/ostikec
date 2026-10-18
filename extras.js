@@ -1,0 +1,3613 @@
+/* ============================================================================
+   EXTRAS.JS — Añadidos a OSTIKEC sin modificar el código original
+   ============================================================================
+   Secciones:
+     1.  Constantes
+     2.  Utilidades generales
+     3.  Almacenamiento: negocios
+     4.  Almacenamiento: etiquetas
+     5.  Almacenamiento: estilo del ticket
+     6.  Almacenamiento: historial
+     7.  Almacenamiento: numeración
+     8.  Almacenamiento: seguridad
+     9.  Almacenamiento: apariencia
+     10. Almacenamiento: configuración de campos
+     11. Botón negocios
+     12. Modal negocios
+     13. Guardar/listar/borrar negocios
+     14. Exportar/importar negocios
+     15. Modal info del creador
+     16. Selectores de etiquetas
+     17. Campos opcionales inyectados en el formulario
+     18. Helpers de dibujo en canvas
+     19. Dibujo del ticket personalizado (pie en una sola línea)
+     20. Wrappers de mostrarResultadoValidacion / Validador (con aviso de fecha)
+     21. Wrapper de construirContenidoQR (emisor)
+     22. Ojo de licencia
+     23. Confirmación de salida
+     24. Términos y Condiciones
+     25. Manual de uso
+     26. Menú flotante
+     27. Secciones del panel
+     28. Listeners del panel
+     29. Operaciones auxiliares del panel
+     30. Exportar a PDF y Excel
+     31. Exportar / importar configuración completa
+     32. Interceptor del botón Crear
+     33. Arranque
+     34. API PÚBLICA PARA MÓDULOS EXTERNOS
+     35. Tour de Bienvenida 
+   ============================================================================ */
+
+(function () {
+  'use strict';
+
+  /* ============================================================
+     1. CONSTANTES
+     ============================================================ */
+  const CLAVE_NEGOCIOS       = 'ostikec_negocios';
+  const CLAVE_NEGOCIO_ACTIVO = 'ostikec_negocio_activo';
+  const CLAVE_ETIQUETAS      = 'ostikec_etiquetas_por_negocio';
+  const CLAVE_SESION         = 'ostikec_sesion';
+  const CLAVE_ESTILO         = 'ostikec_estilo_ticket';
+  const CLAVE_HISTORIAL      = 'ostikec_historial';
+  const CLAVE_NUMERACION     = 'ostikec_numeracion';
+  const CLAVE_SEGURIDAD      = 'ostikec_seguridad';
+  const CLAVE_APARIENCIA     = 'ostikec_apariencia';
+  const CLAVE_MENU_ESTADO    = 'ostikec_menu_estado';
+  const CLAVE_LOG_FALLOS     = 'ostikec_log_fallos';
+  const CLAVE_CAMPOS_CONFIG  = 'ostikec_campos_config';
+  const CLAVE_AUTO_CONFIG    = 'ostikec_auto_config';
+  const CLAVE_AUTO_CONTADOR  = 'ostikec_auto_contador';
+
+  const FIRMA_ARCHIVO   = 'OSTIKEC_NEGOCIOS';
+  const VERSION_FORMATO = 1;
+  const MAX_OTRO        = 20;
+  const MAX_PIE         = 60;
+  const MAX_MARCA_AGUA  = 30;
+  const MAX_HISTORIAL   = 500;
+
+  const OPCIONES_ETIQUETAS = [
+    'No. Ticket', 'No. Asiento', 'No. Factura', 'No. Servicio',
+    'No. Orden', 'Referencia', 'Código', 'Precio', 'ID Servicio', 'Otro'
+  ];
+  const DEFAULT_A = 'No. Asiento';
+  const DEFAULT_I = 'ID Servicio';
+
+  const PALETA_CINTAS = [
+    { nombre: 'Azul OSTIKEC', hex: '#16324f' },
+    { nombre: 'Negro', hex: '#1f2937' },
+    { nombre: 'Rojo', hex: '#991b1b' },
+    { nombre: 'Verde', hex: '#166534' },
+    { nombre: 'Morado', hex: '#6b21a8' },
+    { nombre: 'Naranja', hex: '#c2410c' },
+    { nombre: 'Rosa', hex: '#9d174d' },
+    { nombre: 'Gris', hex: '#475569' }
+  ];
+  const PALETA_FONDOS = [
+    { nombre: 'Blanco', hex: '#ffffff' },
+    { nombre: 'Crema', hex: '#fffbeb' },
+    { nombre: 'Gris claro', hex: '#f8fafc' },
+    { nombre: 'Celeste', hex: '#f0f9ff' }
+  ];
+  const PALETA_ACENTOS = [
+    { nombre: 'Dorado OSTIKEC', hex: '#f2a900' },
+    { nombre: 'Azul', hex: '#2563eb' },
+    { nombre: 'Verde', hex: '#16a34a' },
+    { nombre: 'Rojo', hex: '#dc2626' },
+    { nombre: 'Morado', hex: '#9333ea' },
+    { nombre: 'Naranja', hex: '#ea580c' },
+    { nombre: 'Rosa', hex: '#db2777' },
+    { nombre: 'Gris', hex: '#64748b' }
+  ];
+  const FUENTES_TICKET = ['Arial', 'Helvetica', 'Times New Roman', 'Courier New'];
+  const TAMANOS_QR = [
+    { nombre: 'Pequeño', valor: 300 },
+    { nombre: 'Mediano', valor: 400 },
+    { nombre: 'Grande', valor: 500 }
+  ];
+
+  const ESTILO_POR_DEFECTO = {
+    colorCinta: '#16324f',
+    colorFondo: '#ffffff',
+    colorAcento: '#f2a900',
+    mostrarLogo: true,
+    formaLogo: 'circulo',
+    tamanoQR: 400,
+    orientacion: 'vertical',
+    fuente: 'Arial',
+    pie: '',
+    marcaAgua: ''
+  };
+
+  const CAMPOS_CONFIG_DEFECTO = {
+    activarCorreo: false,
+    activarDireccion: false,
+    activarNotas: false,
+    ocultarVacios: false,
+    numeracionActiva: false,
+    numeracionPrefijo: 'T-'
+  };
+
+  /* Número de ticket en curso (solo visual, no va en el QR) */
+  let numeroTicketActual = null;
+
+  /* Configuración de tamaño compacto para el ticket */
+  const TAM_ETIQUETA = 12;
+  const TAM_VALOR    = 20;
+  const LINE_HEIGHT  = 24;
+  const ESPACIO_CELDA = 10;
+
+  /* Alturas base para el layout vertical */
+  const ALTURA_ENCABEZADO = 215;
+  const ALTURA_MINIMA     = 1080;
+  const TAM_QR_MINIMO     = 180;
+
+  /* ============================================================
+     2. UTILIDADES GENERALES
+     ============================================================ */
+  function leerJSON(clave, porDefecto) {
+    try {
+      const bruto = localStorage.getItem(clave);
+      if (!bruto) return porDefecto;
+      const obj = JSON.parse(bruto);
+      return (obj !== null && obj !== undefined) ? obj : porDefecto;
+    } catch (e) { return porDefecto; }
+  }
+
+  function guardarJSON(clave, valor) {
+    try { localStorage.setItem(clave, JSON.stringify(valor)); } catch (e) {}
+  }
+
+  function nuevoId() {
+    return 'neg_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+  }
+
+  function colorDeContraste(hexColor) {
+    if (!hexColor || hexColor.length !== 7) return '#ffffff';
+    const r = parseInt(hexColor.substr(1, 2), 16) / 255;
+    const g = parseInt(hexColor.substr(3, 2), 16) / 255;
+    const b = parseInt(hexColor.substr(5, 2), 16) / 255;
+    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return lum > 0.55 ? '#1f2937' : '#ffffff';
+  }
+
+  function descargarBlob(blob, nombreArchivo) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombreArchivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
+  }
+
+  function fechaHoraEmisionLocal() {
+    const d = new Date();
+    const dos = n => String(n).padStart(2, '0');
+    return dos(d.getDate()) + '/' + dos(d.getMonth() + 1) + '/' + d.getFullYear()
+      + '  ' + dos(d.getHours()) + ':' + dos(d.getMinutes());
+  }
+
+  function fechaHoraExportacionLocal() {
+    return new Date().toLocaleString('es-ES', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  }
+
+  function envolverTexto(ctx, texto, anchoMaximo) {
+    const palabras = String(texto).split(' ');
+    const lineas = [];
+    let actual = '';
+    for (const palabra of palabras) {
+      const prueba = actual ? actual + ' ' + palabra : palabra;
+      if (ctx.measureText(prueba).width > anchoMaximo && actual) {
+        lineas.push(actual);
+        actual = palabra;
+      } else {
+        actual = prueba;
+      }
+    }
+    if (actual) lineas.push(actual);
+    return lineas;
+  }
+
+  /* ============================================================
+     3. ALMACENAMIENTO: NEGOCIOS
+     ============================================================ */
+  function leerNegocios() {
+    const lista = leerJSON(CLAVE_NEGOCIOS, []);
+    return Array.isArray(lista) ? lista : [];
+  }
+  function guardarNegocios(lista) { guardarJSON(CLAVE_NEGOCIOS, lista); }
+  function leerActivoId() {
+    try { return localStorage.getItem(CLAVE_NEGOCIO_ACTIVO) || ''; } catch (e) { return ''; }
+  }
+  function guardarActivoId(id) {
+    try { localStorage.setItem(CLAVE_NEGOCIO_ACTIVO, id || ''); } catch (e) {}
+  }
+  function obtenerNegocioActivo() {
+    const id = leerActivoId();
+    if (!id) return null;
+    return leerNegocios().find(n => n.id === id) || null;
+  }
+
+  /* ============================================================
+     4. ALMACENAMIENTO: ETIQUETAS
+     ============================================================ */
+  function leerMapaEtiquetas() {
+    const obj = leerJSON(CLAVE_ETIQUETAS, {});
+    return (obj && typeof obj === 'object') ? obj : {};
+  }
+  function guardarMapaEtiquetas(mapa) { guardarJSON(CLAVE_ETIQUETAS, mapa); }
+  function obtenerConfiguracionActual() {
+    const activoId = leerActivoId();
+    const mapa = leerMapaEtiquetas();
+    const config = (activoId && mapa[activoId]) ? mapa[activoId] : {};
+    return {
+      a: config.a || DEFAULT_A,
+      aOtro: config.aOtro || '',
+      i: config.i || DEFAULT_I,
+      iOtro: config.iOtro || ''
+    };
+  }
+  function guardarConfiguracionActual(config) {
+    const activoId = leerActivoId();
+    if (!activoId) return;
+    const mapa = leerMapaEtiquetas();
+    mapa[activoId] = config;
+    guardarMapaEtiquetas(mapa);
+  }
+  function obtenerLabelMostrable(config, campo) {
+    const valor = config[campo];
+    if (valor === 'Otro') {
+      const custom = (config[campo + 'Otro'] || '').trim();
+      return custom || (campo === 'a' ? DEFAULT_A : DEFAULT_I);
+    }
+    return valor || (campo === 'a' ? DEFAULT_A : DEFAULT_I);
+  }
+
+  /* ============================================================
+     5. ALMACENAMIENTO: ESTILO DEL TICKET
+     ============================================================ */
+  function leerMapaEstilos() {
+    const obj = leerJSON(CLAVE_ESTILO, {});
+    return (obj && typeof obj === 'object') ? obj : {};
+  }
+  function guardarMapaEstilos(mapa) { guardarJSON(CLAVE_ESTILO, mapa); }
+  function claveEstiloActual() { return leerActivoId() || '_default'; }
+  function obtenerEstiloActual() {
+    const mapa = leerMapaEstilos();
+    const cfg = mapa[claveEstiloActual()] || {};
+    return Object.assign({}, ESTILO_POR_DEFECTO, cfg);
+  }
+  function guardarEstiloActual(estilo) {
+    const mapa = leerMapaEstilos();
+    mapa[claveEstiloActual()] = estilo;
+    guardarMapaEstilos(mapa);
+  }
+  function actualizarEstiloParcial(cambios) {
+    const estilo = obtenerEstiloActual();
+    Object.assign(estilo, cambios);
+    guardarEstiloActual(estilo);
+  }
+
+  /* ============================================================
+     6. ALMACENAMIENTO: HISTORIAL
+     ============================================================ */
+  function leerHistorial() {
+    const lista = leerJSON(CLAVE_HISTORIAL, []);
+    return Array.isArray(lista) ? lista : [];
+  }
+  function guardarHistorial(lista) {
+    if (lista.length > MAX_HISTORIAL) lista = lista.slice(-MAX_HISTORIAL);
+    guardarJSON(CLAVE_HISTORIAL, lista);
+  }
+  function agregarAlHistorial(entrada) {
+    const lista = leerHistorial();
+    lista.push(entrada);
+    guardarHistorial(lista);
+  }
+
+  /* ============================================================
+     7. ALMACENAMIENTO: NUMERACIÓN
+     ============================================================ */
+  function leerMapaNumeracion() {
+    const obj = leerJSON(CLAVE_NUMERACION, {});
+    return (obj && typeof obj === 'object') ? obj : {};
+  }
+  function guardarMapaNumeracion(mapa) { guardarJSON(CLAVE_NUMERACION, mapa); }
+    function siguienteNumero() {
+    const clave = leerActivoId() || '_default';
+    const mapa = leerMapaNumeracion();
+
+    /* --- Comprobación de reinicio periódico --- */
+    const configReinicio = leerJSON('ostikec_numeracion_reinicio', {
+      modo: 'nunca',
+      ultimoReinicio: 0
+    });
+
+    if (configReinicio.modo === 'mes' || configReinicio.modo === 'anio') {
+      const ahora = new Date();
+      const ultima = configReinicio.ultimoReinicio
+        ? new Date(configReinicio.ultimoReinicio)
+        : null;
+
+      let tocaReiniciar = false;
+      if (!ultima) {
+        tocaReiniciar = true;
+      } else if (configReinicio.modo === 'mes') {
+        if (ahora.getMonth() !== ultima.getMonth() ||
+            ahora.getFullYear() !== ultima.getFullYear()) {
+          tocaReiniciar = true;
+        }
+      } else if (configReinicio.modo === 'anio') {
+        if (ahora.getFullYear() !== ultima.getFullYear()) {
+          tocaReiniciar = true;
+        }
+      }
+
+      if (tocaReiniciar) {
+        mapa[clave] = 0;
+        configReinicio.ultimoReinicio = ahora.getTime();
+        guardarJSON('ostikec_numeracion_reinicio', configReinicio);
+        guardarMapaNumeracion(mapa);
+      }
+    }
+
+    const actual = parseInt(mapa[clave] || '0', 10) || 0;
+    const nuevo = actual + 1;
+    mapa[clave] = nuevo;
+    guardarMapaNumeracion(mapa);
+    return nuevo;
+  }
+
+  /* ============================================================
+     8. ALMACENAMIENTO: SEGURIDAD
+     ============================================================ */
+  const SEGURIDAD_POR_DEFECTO = { modoCiego: false, logFallos: true };
+  function leerSeguridad() {
+    return Object.assign({}, SEGURIDAD_POR_DEFECTO, leerJSON(CLAVE_SEGURIDAD, {}));
+  }
+  function guardarSeguridad(cfg) { guardarJSON(CLAVE_SEGURIDAD, cfg); }
+  function leerLogFallos() {
+    const lista = leerJSON(CLAVE_LOG_FALLOS, []);
+    return Array.isArray(lista) ? lista : [];
+  }
+  function agregarFalloLog(motivo) {
+    if (!leerSeguridad().logFallos) return;
+    const lista = leerLogFallos();
+    lista.push({ fecha: new Date().toISOString(), motivo: motivo || '' });
+    if (lista.length > 200) lista.splice(0, lista.length - 200);
+    guardarJSON(CLAVE_LOG_FALLOS, lista);
+  }
+
+  /* ============================================================
+     9. ALMACENAMIENTO: APARIENCIA
+     ============================================================ */
+  function leerApariencia() {
+    return Object.assign({ modoOscuro: false }, leerJSON(CLAVE_APARIENCIA, {}));
+  }
+  function guardarApariencia(cfg) { guardarJSON(CLAVE_APARIENCIA, cfg); }
+  function aplicarModoOscuro() {
+    const { modoOscuro } = leerApariencia();
+    if (modoOscuro) document.body.classList.add('modo-oscuro');
+    else document.body.classList.remove('modo-oscuro');
+  }
+
+  /* ============================================================
+     10. ALMACENAMIENTO: CONFIGURACIÓN DE CAMPOS
+     ============================================================ */
+  function leerCamposConfig() {
+    return Object.assign({}, CAMPOS_CONFIG_DEFECTO, leerJSON(CLAVE_CAMPOS_CONFIG, {}));
+  }
+  function guardarCamposConfig(cfg) { guardarJSON(CLAVE_CAMPOS_CONFIG, cfg); }
+
+    /* ============================================================
+     10b. ALMACENAMIENTO: AUTO-NUMERACIÓN DE CAMPOS 4 Y 5
+     ============================================================ */
+
+  /* Estructura de almacenamiento:
+       ostikec_auto_config   → { "negId_a": { activo, limite, prefijo }, ... }
+       ostikec_auto_contador → { "negId_a": 12, "negId_i": 0, ... }
+
+     El sufijo "_a" o "_i" indica el campo (4 o 5). El prefijo es el id
+     del negocio activo, o "_default" cuando no hay ninguno. */
+
+  const AUTO_CONFIG_DEFECTO = { activo: false, limite: 0, prefijo: '' };
+
+  function claveAuto(campo) {
+    return (leerActivoId() || '_default') + '_' + campo;
+  }
+
+  function leerMapaAutoConfig() {
+    const obj = leerJSON(CLAVE_AUTO_CONFIG, {});
+    return (obj && typeof obj === 'object') ? obj : {};
+  }
+
+  function leerAutoConfig(campo) {
+    const clave = claveAuto(campo);
+    const mapa = leerMapaAutoConfig();
+    return Object.assign({}, AUTO_CONFIG_DEFECTO, mapa[clave] || {});
+  }
+
+  function guardarAutoConfig(campo, cfg) {
+    const clave = claveAuto(campo);
+    const mapa = leerMapaAutoConfig();
+    mapa[clave] = Object.assign({}, AUTO_CONFIG_DEFECTO, cfg);
+    guardarJSON(CLAVE_AUTO_CONFIG, mapa);
+  }
+
+  function leerMapaAutoContador() {
+    const obj = leerJSON(CLAVE_AUTO_CONTADOR, {});
+    return (obj && typeof obj === 'object') ? obj : {};
+  }
+
+  function leerAutoContador(campo) {
+    const clave = claveAuto(campo);
+    const mapa = leerMapaAutoContador();
+    const v = parseInt(mapa[clave], 10);
+    return (isNaN(v) || v < 0) ? 0 : v;
+  }
+
+  function guardarAutoContador(campo, valor) {
+    const clave = claveAuto(campo);
+    const mapa = leerMapaAutoContador();
+    mapa[clave] = Math.max(0, parseInt(valor, 10) || 0);
+    guardarJSON(CLAVE_AUTO_CONTADOR, mapa);
+  }
+
+  function incrementarAutoContador(campo) {
+    const actual = leerAutoContador(campo);
+    guardarAutoContador(campo, actual + 1);
+  }
+
+  function reiniciarAutoContador(campo) {
+    guardarAutoContador(campo, 0);
+  }
+
+  /* Devuelve true si el campo está activo y el contador alcanzó el límite. */
+  function campoAutoAgotado(campo) {
+    const cfg = leerAutoConfig(campo);
+    if (!cfg.activo) return false;
+    const limite = cfg.limite || 0;
+    if (limite <= 0) return false;
+    return leerAutoContador(campo) >= limite;
+  }
+
+  /* Texto a mostrar en el input del formulario.
+     - Si no está activo: null (no tocar el input)
+     - Si está agotado: "Capacidad agotada"
+     - Si está activo: prefijo + (contador + 1) */
+  function siguienteValorAuto(campo) {
+    const cfg = leerAutoConfig(campo);
+    if (!cfg.activo) return null;
+    if (campoAutoAgotado(campo)) return 'Capacidad agotada';
+    const prefijo = cfg.prefijo || '';
+    return prefijo + (leerAutoContador(campo) + 1);
+  }
+
+  /* Aplica el estado de auto-numeración a un input concreto.
+     idInput: 'inAsiento' | 'inIdServicio'
+     campo:   'a' | 'i' */
+  function aplicarAutoAInput(idInput, campo) {
+    const el = document.getElementById(idInput);
+    if (!el) return;
+
+    const cfg = leerAutoConfig(campo);
+    if (!cfg.activo) {
+      el.readOnly = false;
+      el.style.background = '';
+      el.style.color = '';
+      /* Si el input tenía el texto "Capacidad agotada" de una activación
+         anterior, lo limpiamos para que el usuario empiece de cero. */
+      if (el.value === 'Capacidad agotada') el.value = '';
+      return;
+    }
+
+    el.readOnly = true;
+    const agotado = campoAutoAgotado(campo);
+    el.style.background = '#f1f5f9';
+    el.style.color = agotado ? '#991b1b' : '#16324f';
+    el.value = siguienteValorAuto(campo);
+  }
+
+  /* Aplica el estado de auto-numeración a los dos campos del formulario. */
+  function aplicarAutoAFormulario() {
+    aplicarAutoAInput('inAsiento', 'a');
+    aplicarAutoAInput('inIdServicio', 'i');
+  }
+   
+  /* ============================================================
+     11. BOTÓN NEGOCIOS
+     ============================================================ */
+  function crearBotonNegocios() {
+    const barraDer = document.querySelector('#pantallaCreador .barra-der');
+    if (!barraDer) return;
+    if (document.getElementById('btnNegocios')) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'btnNegocios';
+    btn.className = 'btn-icono';
+    btn.title = 'Negocios y servicios';
+    btn.innerHTML =
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>' +
+      '<path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>';
+
+    const btnLector = document.getElementById('btnAbrirLector');
+    if (btnLector) barraDer.insertBefore(btn, btnLector);
+    else barraDer.appendChild(btn);
+
+    btn.addEventListener('click', abrirModalNegocios);
+  }
+
+  /* ============================================================
+     12. MODAL NEGOCIOS
+     ============================================================ */
+  function crearModalNegocios() {
+    if (document.getElementById('modalNegocios')) return;
+    const modal = document.createElement('div');
+    modal.id = 'modalNegocios';
+    modal.className = 'modal';
+    modal.innerHTML =
+      '<div class="modal-caja">' +
+        '<div class="modal-cabecera">' +
+          '<h3>Negocios y servicios</h3>' +
+          '<button id="btnCerrarNegocios" class="btn-cerrar">✕</button>' +
+        '</div>' +
+        '<div class="modal-cuerpo">' +
+          '<div class="neg-form">' +
+            '<label for="negNombre">Nombre de la Institución</label>' +
+            '<input id="negNombre" type="text" placeholder="Ej. Teatro Nacional" autocomplete="off">' +
+            '<label for="negServicio">Datos del Servicio</label>' +
+            '<input id="negServicio" type="text" placeholder="Ej. Función de las 8:00 PM - Sala A" autocomplete="off">' +
+            '<button id="btnGuardarNegocio" class="btn btn-acento" style="margin-top:6px;">Guardar combinación</button>' +
+          '</div>' +
+          '<h4 class="neg-lista-titulo">Combinaciones guardadas</h4>' +
+          '<div id="negLista" class="neg-lista"></div>' +
+          '<div id="negVacio" class="neg-vacio">Todavía no hay combinaciones guardadas.</div>' +
+          '<div class="acciones" style="margin-top:16px;">' +
+            '<button id="btnExportarNeg" class="btn btn-secundario">Exportar</button>' +
+            '<button id="btnImportarNeg" class="btn btn-acento">Importar</button>' +
+          '</div>' +
+          '<input id="negInputArchivo" type="file" accept=".json,application/json,text/plain" style="display:none">' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(modal);
+
+    document.getElementById('btnCerrarNegocios').addEventListener('click', cerrarModalNegocios);
+    document.getElementById('btnGuardarNegocio').addEventListener('click', guardarNuevaCombinacion);
+    document.getElementById('btnExportarNeg').addEventListener('click', exportarNegocios);
+    document.getElementById('btnImportarNeg').addEventListener('click', function () {
+      document.getElementById('negInputArchivo').click();
+    });
+    document.getElementById('negInputArchivo').addEventListener('change', function () {
+      if (this.files && this.files.length > 0) {
+        importarNegocios(this.files[0]);
+        this.value = '';
+      }
+    });
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) cerrarModalNegocios();
+    });
+  }
+
+  function abrirModalNegocios() {
+    crearModalNegocios();
+    document.getElementById('negNombre').value = '';
+    document.getElementById('negServicio').value = '';
+    renderizarListaNegocios();
+    document.getElementById('modalNegocios').classList.add('visible');
+  }
+  function cerrarModalNegocios() {
+    const m = document.getElementById('modalNegocios');
+    if (m) m.classList.remove('visible');
+  }
+
+  /* ============================================================
+     13. GUARDAR / LISTAR / BORRAR / SELECCIONAR
+     ============================================================ */
+  function guardarNuevaCombinacion() {
+    const nombre   = document.getElementById('negNombre').value.trim();
+    const servicio = document.getElementById('negServicio').value.trim();
+    if (!nombre || !servicio) {
+      alert('Debe completar el nombre de la institución y los datos del servicio.');
+      return;
+    }
+    const lista = leerNegocios();
+    const nuevo = { id: nuevoId(), nombre: nombre, servicio: servicio };
+    lista.push(nuevo);
+    guardarNegocios(lista);
+    guardarActivoId(nuevo.id);
+    document.getElementById('negNombre').value = '';
+    document.getElementById('negServicio').value = '';
+    renderizarListaNegocios();
+    actualizarSelectoresEtiquetas();
+  }
+
+  function borrarNegocio(id) {
+    let lista = leerNegocios();
+    lista = lista.filter(n => n.id !== id);
+    guardarNegocios(lista);
+    if (leerActivoId() === id) guardarActivoId('');
+    renderizarListaNegocios();
+    actualizarSelectoresEtiquetas();
+  }
+
+  function seleccionarNegocio(id) {
+    guardarActivoId(id);
+    renderizarListaNegocios();
+    actualizarSelectoresEtiquetas();
+    aplicarAutoAFormulario();
+    refrescarPanelSiAbierto();
+  }
+
+  function renderizarListaNegocios() {
+    const cont  = document.getElementById('negLista');
+    const vacio = document.getElementById('negVacio');
+    if (!cont || !vacio) return;
+    const lista = leerNegocios();
+    const activoId = leerActivoId();
+    cont.innerHTML = '';
+    if (lista.length === 0) { vacio.style.display = 'block'; return; }
+    vacio.style.display = 'none';
+
+    lista.forEach(function (n) {
+      const item = document.createElement('div');
+      item.className = 'neg-item' + (n.id === activoId ? ' activo' : '');
+
+      const texto = document.createElement('div');
+      texto.className = 'neg-item-texto';
+      const nombreEl = document.createElement('div');
+      nombreEl.className = 'neg-item-nombre';
+      nombreEl.textContent = n.nombre;
+      const servicioEl = document.createElement('div');
+      servicioEl.className = 'neg-item-servicio';
+      servicioEl.textContent = n.servicio;
+      texto.appendChild(nombreEl);
+      texto.appendChild(servicioEl);
+
+      const btnBorrar = document.createElement('button');
+      btnBorrar.className = 'neg-item-borrar';
+      btnBorrar.type = 'button';
+      btnBorrar.textContent = '✕';
+      btnBorrar.title = 'Eliminar';
+      btnBorrar.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (confirm('¿Eliminar esta combinación?')) borrarNegocio(n.id);
+      });
+
+      item.appendChild(texto);
+      item.appendChild(btnBorrar);
+      item.addEventListener('click', function () { seleccionarNegocio(n.id); });
+      cont.appendChild(item);
+    });
+  }
+
+  /* ============================================================
+     14. EXPORTAR / IMPORTAR NEGOCIOS
+     ============================================================ */
+  function exportarNegocios() {
+    const lista = leerNegocios();
+    if (lista.length === 0) {
+      alert('No hay combinaciones guardadas para exportar.');
+      return;
+    }
+    const contenido = {
+      firma: FIRMA_ARCHIVO,
+      version: VERSION_FORMATO,
+      fecha: new Date().toISOString(),
+      negocios: lista,
+      etiquetas: leerMapaEtiquetas(),
+      estilos: leerMapaEstilos()
+    };
+    const json = JSON.stringify(contenido, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const fecha = new Date();
+    const dos = n => String(n).padStart(2, '0');
+    const nombreArchivo = 'ostikec_negocios_'
+      + fecha.getFullYear() + dos(fecha.getMonth() + 1) + dos(fecha.getDate())
+      + '_' + dos(fecha.getHours()) + dos(fecha.getMinutes()) + '.json';
+
+    try {
+      const archivo = new File([blob], nombreArchivo, { type: 'application/json' });
+      if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+        navigator.share({ files: [archivo], title: 'Negocios Ostikec' })
+          .catch(function () { descargarBlob(blob, nombreArchivo); });
+        return;
+      }
+    } catch (e) {}
+    descargarBlob(blob, nombreArchivo);
+  }
+
+  function importarNegocios(archivo) {
+    const lector = new FileReader();
+    lector.onload = function (e) {
+      let datos;
+      try { datos = JSON.parse(e.target.result); }
+      catch (err) { alert('El archivo no tiene un formato válido.'); return; }
+
+      let lista, etiquetasImp = null, estilosImp = null;
+      if (Array.isArray(datos)) lista = datos;
+      else if (datos && Array.isArray(datos.negocios)) {
+        lista = datos.negocios;
+        if (datos.etiquetas && typeof datos.etiquetas === 'object') etiquetasImp = datos.etiquetas;
+        if (datos.estilos && typeof datos.estilos === 'object') estilosImp = datos.estilos;
+      } else {
+        alert('El archivo no contiene combinaciones reconocibles.');
+        return;
+      }
+      if (lista.length === 0) {
+        alert('El archivo no tiene combinaciones para importar.');
+        return;
+      }
+
+      const actuales = leerNegocios();
+      let agregados = 0, duplicados = 0;
+      lista.forEach(function (n) {
+        if (!n || typeof n.nombre !== 'string' || typeof n.servicio !== 'string') return;
+        const nombre   = n.nombre.trim();
+        const servicio = n.servicio.trim();
+        if (!nombre || !servicio) return;
+        const yaExiste = actuales.some(a => a.nombre === nombre && a.servicio === servicio);
+        if (yaExiste) { duplicados++; return; }
+        actuales.push({ id: nuevoId(), nombre: nombre, servicio: servicio });
+        agregados++;
+      });
+      guardarNegocios(actuales);
+
+      if (etiquetasImp) {
+        const mapaActual = leerMapaEtiquetas();
+        Object.keys(etiquetasImp).forEach(k => { if (!mapaActual[k]) mapaActual[k] = etiquetasImp[k]; });
+        guardarMapaEtiquetas(mapaActual);
+      }
+      if (estilosImp) {
+        const mapaEst = leerMapaEstilos();
+        Object.keys(estilosImp).forEach(k => { if (!mapaEst[k]) mapaEst[k] = estilosImp[k]; });
+        guardarMapaEstilos(mapaEst);
+      }
+      renderizarListaNegocios();
+      actualizarSelectoresEtiquetas();
+      refrescarPanelSiAbierto();
+      let mensaje = 'Se importaron ' + agregados + ' combinación(es).';
+      if (duplicados > 0) mensaje += '\nSe omitieron ' + duplicados + ' por estar duplicadas.';
+      alert(mensaje);
+    };
+    lector.onerror = function () { alert('No se pudo leer el archivo.'); };
+    lector.readAsText(archivo);
+  }
+
+  /* ============================================================
+     15. MODAL INFO DEL CREADOR
+     ============================================================ */
+  function crearModalInfo() {
+    if (document.getElementById('modalInfo')) return;
+    const modal = document.createElement('div');
+    modal.id = 'modalInfo';
+    modal.className = 'modal';
+    modal.innerHTML =
+      '<div class="modal-caja">' +
+        '<div class="modal-cabecera">' +
+          '<h3>Información</h3>' +
+          '<button id="btnCerrarInfo" class="btn-cerrar">✕</button>' +
+        '</div>' +
+        '<div class="modal-cuerpo">' +
+          '<div class="info-creador">' +
+            '<p class="info-titulo">OSTIKEC</p>' +
+            '<p class="info-autor">Desarrollada por Osmani Tito Corrioso</p>' +
+            '<p class="info-grupo">&copy; OSTICOR 2026</p>' +
+            '<p class="info-derechos">Todos los derechos reservados</p>' +
+            '<p class="info-aviso">No puede utilizar ni compartir la apk sin la licencia y la autorización del creador</p>' +
+            '<p class="info-contacto">Contacto: osmanitito94@zoho.com</p>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(modal);
+    document.getElementById('btnCerrarInfo').addEventListener('click', function () {
+      modal.classList.remove('visible');
+    });
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) modal.classList.remove('visible');
+    });
+  }
+  function abrirModalInfo() {
+    crearModalInfo();
+    document.getElementById('modalInfo').classList.add('visible');
+  }
+  function instalarBotonInfo() {
+    ['pantallaCreador', 'pantallaValidador'].forEach(function (idPantalla) {
+      const pantalla = document.getElementById(idPantalla);
+      if (!pantalla) return;
+      const titulo = pantalla.querySelector('.barra-titulo');
+      if (!titulo) return;
+      if (titulo.dataset.infoInstalada === '1') return;
+      titulo.dataset.infoInstalada = '1';
+      titulo.addEventListener('click', abrirModalInfo);
+    });
+  }
+
+  /* ============================================================
+     16. SELECTORES DE ETIQUETAS
+     ============================================================ */
+  function crearSelectEtiqueta(campo) {
+    const select = document.createElement('select');
+    select.className = 'select-etiqueta';
+    select.id = 'selEtiqueta_' + campo;
+    OPCIONES_ETIQUETAS.forEach(function (opt) {
+      const o = document.createElement('option');
+      o.value = opt;
+      o.textContent = opt;
+      select.appendChild(o);
+    });
+    return select;
+  }
+
+  function crearInputOtro(campo) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'input-otro';
+    input.id = 'inputOtro_' + campo;
+    input.maxLength = MAX_OTRO;
+    input.placeholder = 'Escriba la etiqueta (máx. ' + MAX_OTRO + ')';
+    input.autocomplete = 'off';
+    input.style.display = 'none';
+    return input;
+  }
+
+  function inyectarSelectoresEtiquetas() {
+    if (!document.getElementById('selEtiqueta_a')) {
+      const labelA = document.querySelector('#pantallaCreador label[for="inAsiento"]');
+      if (labelA && labelA.parentNode) {
+        const selectA = crearSelectEtiqueta('a');
+        const inputA  = crearInputOtro('a');
+        labelA.parentNode.insertBefore(selectA, labelA);
+        labelA.parentNode.insertBefore(inputA, labelA);
+        labelA.style.display = 'none';
+
+        selectA.addEventListener('change', function () { onCambioEtiqueta('a'); });
+        inputA.addEventListener('input', function () {
+          const custom = this.value.replace(/[^\wáéíóúÁÉÍÓÚñÑ.\- ]/g, '').substring(0, MAX_OTRO);
+          if (custom !== this.value) this.value = custom;
+          guardarConfigDesdeUI();
+        });
+      }
+    }
+    if (!document.getElementById('selEtiqueta_i')) {
+      const labelI = document.querySelector('#pantallaCreador label[for="inIdServicio"]');
+      if (labelI && labelI.parentNode) {
+        const selectI = crearSelectEtiqueta('i');
+        const inputI  = crearInputOtro('i');
+        labelI.parentNode.insertBefore(selectI, labelI);
+        labelI.parentNode.insertBefore(inputI, labelI);
+        labelI.style.display = 'none';
+
+        selectI.addEventListener('change', function () { onCambioEtiqueta('i'); });
+        inputI.addEventListener('input', function () {
+          const custom = this.value.replace(/[^\wáéíóúÁÉÍÓÚñÑ.\- ]/g, '').substring(0, MAX_OTRO);
+          if (custom !== this.value) this.value = custom;
+          guardarConfigDesdeUI();
+        });
+      }
+    }
+  }
+
+  function onCambioEtiqueta(campo) {
+    const select = document.getElementById('selEtiqueta_' + campo);
+    const inputOtro = document.getElementById('inputOtro_' + campo);
+    if (!select || !inputOtro) return;
+    if (select.value === 'Otro') {
+      inputOtro.style.display = 'block';
+      inputOtro.focus();
+    } else {
+      inputOtro.style.display = 'none';
+      inputOtro.value = '';
+    }
+    guardarConfigDesdeUI();
+  }
+
+  function guardarConfigDesdeUI() {
+    const selectA = document.getElementById('selEtiqueta_a');
+    const selectI = document.getElementById('selEtiqueta_i');
+    const inputA  = document.getElementById('inputOtro_a');
+    const inputI  = document.getElementById('inputOtro_i');
+    if (!selectA || !selectI || !inputA || !inputI) return;
+    guardarConfiguracionActual({
+      a: selectA.value,
+      aOtro: selectA.value === 'Otro' ? inputA.value.trim() : '',
+      i: selectI.value,
+      iOtro: selectI.value === 'Otro' ? inputI.value.trim() : ''
+    });
+  }
+
+  function actualizarSelectoresEtiquetas() {
+    inyectarSelectoresEtiquetas();
+    const config = obtenerConfiguracionActual();
+    const selectA = document.getElementById('selEtiqueta_a');
+    const selectI = document.getElementById('selEtiqueta_i');
+    const inputA  = document.getElementById('inputOtro_a');
+    const inputI  = document.getElementById('inputOtro_i');
+    if (!selectA || !selectI || !inputA || !inputI) return;
+
+    selectA.value = config.a;
+    if (config.a === 'Otro') { inputA.style.display = 'block'; inputA.value = config.aOtro || ''; }
+    else { inputA.style.display = 'none'; inputA.value = ''; }
+
+    selectI.value = config.i;
+    if (config.i === 'Otro') { inputI.style.display = 'block'; inputI.value = config.iOtro || ''; }
+    else { inputI.style.display = 'none'; inputI.value = ''; }
+  }
+
+  /* ============================================================
+     17. CAMPOS OPCIONALES INYECTADOS EN EL FORMULARIO
+     ============================================================ */
+  function crearBloqueOpcional(id, label, placeholder) {
+    const bloque = document.createElement('div');
+    bloque.className = 'campo-bloque campo-opcional-oculto';
+    bloque.id = 'bloqueOpcional_' + id;
+    bloque.innerHTML =
+      '<label for="' + id + '">' + label + '</label>' +
+      '<div class="campo">' +
+        '<input id="' + id + '" type="text" placeholder="' + placeholder + '" autocomplete="off">' +
+        '<button type="button" class="btn-limpiar-campo" data-target="' + id + '">✕</button>' +
+      '</div>';
+    return bloque;
+  }
+
+  function inyectarCamposOpcionales() {
+    if (document.getElementById('inCorreo')) return;
+    const inIdServicio = document.getElementById('inIdServicio');
+    if (!inIdServicio) return;
+    const bloqueIdServicio = inIdServicio.closest('.campo-bloque');
+    if (!bloqueIdServicio || !bloqueIdServicio.parentNode) return;
+
+    const bloqueCorreo = crearBloqueOpcional('inCorreo', 'Correo electrónico', 'correo@ejemplo.com');
+    const bloqueDireccion = crearBloqueOpcional('inDireccion', 'Dirección', 'Dirección');
+    const bloqueNotas = crearBloqueOpcional('inNotas', 'Notas', 'Notas adicionales');
+
+    bloqueIdServicio.parentNode.insertBefore(bloqueCorreo, bloqueIdServicio.nextSibling);
+    bloqueCorreo.parentNode.insertBefore(bloqueDireccion, bloqueCorreo.nextSibling);
+    bloqueDireccion.parentNode.insertBefore(bloqueNotas, bloqueDireccion.nextSibling);
+
+    [bloqueCorreo, bloqueDireccion, bloqueNotas].forEach(function (bloque) {
+      const btn = bloque.querySelector('.btn-limpiar-campo');
+      if (btn) {
+        btn.addEventListener('click', function () {
+          const target = this.getAttribute('data-target');
+          const input = document.getElementById(target);
+          if (input) input.value = '';
+          const zona = document.getElementById('zonaResultado');
+          if (zona) zona.classList.add('oculto');
+        });
+      }
+    });
+
+    actualizarVisibilidadCamposOpcionales();
+  }
+
+  function actualizarVisibilidadCamposOpcionales() {
+    const cfg = leerCamposConfig();
+    const toggle = function (idBloque, mostrar) {
+      const el = document.getElementById(idBloque);
+      if (!el) return;
+      if (mostrar) el.classList.remove('campo-opcional-oculto');
+      else el.classList.add('campo-opcional-oculto');
+    };
+    toggle('bloqueOpcional_inCorreo', cfg.activarCorreo);
+    toggle('bloqueOpcional_inDireccion', cfg.activarDireccion);
+    toggle('bloqueOpcional_inNotas', cfg.activarNotas);
+  }
+
+  function obtenerCamposOpcionales() {
+    return {
+      correo:    (document.getElementById('inCorreo')    || {}).value ? document.getElementById('inCorreo').value.trim()    : '',
+      direccion: (document.getElementById('inDireccion') || {}).value ? document.getElementById('inDireccion').value.trim() : '',
+      notas:     (document.getElementById('inNotas')     || {}).value ? document.getElementById('inNotas').value.trim()     : ''
+    };
+  }
+
+  /* ============================================================
+     18. HELPERS DE DIBUJO EN CANVAS
+     ============================================================ */
+  function dibujarCeldaCompacta(ctx, etiqueta, valor, x, y, ancho, fuente) {
+    ctx.fillStyle = '#64748b';
+    ctx.font = 'bold ' + TAM_ETIQUETA + 'px ' + fuente + ', sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(etiqueta, x, y);
+
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold ' + TAM_VALOR + 'px ' + fuente + ', sans-serif';
+    const lineas = envolverTexto(ctx, valor || '—', ancho);
+
+    let yL = y + TAM_ETIQUETA + 6;
+    for (const linea of lineas) {
+      ctx.fillText(linea, x, yL);
+      yL += LINE_HEIGHT;
+    }
+    return (yL - y);
+  }
+
+  function medirAlturaCelda(ctx, valor, ancho, fuente) {
+    ctx.font = 'bold ' + TAM_VALOR + 'px ' + fuente + ', sans-serif';
+    const lineas = envolverTexto(ctx, valor || '—', ancho);
+    return TAM_ETIQUETA + 6 + lineas.length * LINE_HEIGHT;
+  }
+
+  function dibujarQRCanvas(ctx, texto, x, y, tam) {
+    if (typeof qrcode !== 'function') return;
+    const qr = qrcode(0, 'M');
+    qr.addData(texto);
+    qr.make();
+    const modulos = qr.getModuleCount();
+    const lado = tam / modulos;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x, y, tam, tam);
+
+    ctx.fillStyle = '#000000';
+    for (let fila = 0; fila < modulos; fila++) {
+      for (let col = 0; col < modulos; col++) {
+        if (qr.isDark(fila, col)) {
+          ctx.fillRect(x + col * lado, y + fila * lado, Math.ceil(lado), Math.ceil(lado));
+        }
+      }
+    }
+  }
+
+  function dibujarLogoForma(ctx, x, y, tam, estilo) {
+    const cx = x + tam / 2;
+    const cy = y + tam / 2;
+    const r  = tam / 2;
+
+    ctx.save();
+    ctx.beginPath();
+    if (estilo.formaLogo === 'cuadrado') {
+      const radio = tam * 0.15;
+      ctx.moveTo(x + radio, y);
+      ctx.lineTo(x + tam - radio, y);
+      ctx.quadraticCurveTo(x + tam, y, x + tam, y + radio);
+      ctx.lineTo(x + tam, y + tam - radio);
+      ctx.quadraticCurveTo(x + tam, y + tam, x + tam - radio, y + tam);
+      ctx.lineTo(x + radio, y + tam);
+      ctx.quadraticCurveTo(x, y + tam, x, y + tam - radio);
+      ctx.lineTo(x, y + radio);
+      ctx.quadraticCurveTo(x, y, x + radio, y);
+      ctx.closePath();
+    } else if (estilo.formaLogo === 'hexagono') {
+      for (let i = 0; i < 6; i++) {
+        const ang = (Math.PI / 3) * i - Math.PI / 2;
+        const px = cx + r * Math.cos(ang);
+        const py = cy + r * Math.sin(ang);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    } else {
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    }
+    ctx.fillStyle = estilo.colorAcento;
+    ctx.fill();
+    ctx.lineWidth = Math.max(2, tam * 0.06);
+    ctx.strokeStyle = estilo.colorCinta;
+    ctx.stroke();
+
+    ctx.fillStyle = estilo.colorCinta;
+    ctx.font = 'bold ' + Math.round(tam * 0.48) + 'px ' + (estilo.fuente || 'Arial') + ', sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('OT', cx, cy + tam * 0.03);
+    ctx.restore();
+  }
+
+  /* ============================================================
+     19. DIBUJO DEL TICKET PERSONALIZADO
+     (con pie de "EMITIDO" + fecha en una sola línea)
+     ============================================================ */
+  function instalarDibujarTicketPersonalizado() {
+    window.dibujarTicket = function (datos, textoQR) {
+      const estilo = obtenerEstiloActual();
+      const cfgCampos = leerCamposConfig();
+      const fuente = estilo.fuente || 'Arial';
+
+      const esHorizontal = estilo.orientacion === 'horizontal';
+      const W = esHorizontal ? 1080 : 720;
+
+      const cv = document.getElementById('canvasTicket');
+      if (!cv) return;
+
+      /* --------------------------------------------------------
+         FASE 1: MEDICIÓN
+         -------------------------------------------------------- */
+      const cvMedicion = document.createElement('canvas');
+      cvMedicion.width = 10;
+      cvMedicion.height = 10;
+      const ctxMed = cvMedicion.getContext('2d');
+
+      const MARGEN = 40;
+      const GAP_COL = 24;
+      const ANCHO_UTIL = W - MARGEN * 2;
+      const ANCHO_COL = (ANCHO_UTIL - GAP_COL) / 2;
+      const tamQRConfigurado = estilo.tamanoQR || 400;
+
+      const config = obtenerConfiguracionActual();
+      const labelA = obtenerLabelMostrable(config, 'a').toUpperCase();
+      const labelI = obtenerLabelMostrable(config, 'i').toUpperCase();
+
+      const campos = obtenerCamposOpcionales();
+      const mostrarCorreo    = cfgCampos.activarCorreo    && (campos.correo    || !cfgCampos.ocultarVacios);
+      const mostrarDireccion = cfgCampos.activarDireccion && (campos.direccion || !cfgCampos.ocultarVacios);
+      const mostrarNotas     = cfgCampos.activarNotas     && (campos.notas     || !cfgCampos.ocultarVacios);
+
+      const filas = [];
+      filas.push({ tipo: 'full', label: 'NOMBRE', valor: datos.n });
+      filas.push({ tipo: 'two', labelA: 'FECHA', valA: datos.f, labelB: 'TELÉFONO', valB: datos.t });
+      filas.push({ tipo: 'two', labelA: labelA, valA: datos.a, labelB: labelI, valB: datos.i });
+      if (mostrarCorreo && mostrarDireccion) {
+        filas.push({ tipo: 'two', labelA: 'CORREO', valA: campos.correo, labelB: 'DIRECCIÓN', valB: campos.direccion });
+      } else if (mostrarCorreo) {
+        filas.push({ tipo: 'full', label: 'CORREO', valor: campos.correo });
+      } else if (mostrarDireccion) {
+        filas.push({ tipo: 'full', label: 'DIRECCIÓN', valor: campos.direccion });
+      }
+      if (mostrarNotas) {
+        filas.push({ tipo: 'full', label: 'NOTAS', valor: campos.notas });
+      }
+
+      /* Cuerpo */
+      let alturaCuerpo = 0;
+      if (esHorizontal) {
+        const anchoColumna = Math.floor(ANCHO_UTIL * 0.55);
+        filas.forEach(function (fila) {
+          if (fila.tipo === 'full') {
+            alturaCuerpo += medirAlturaCelda(ctxMed, fila.valor, anchoColumna, fuente) + 12;
+          } else {
+            alturaCuerpo += medirAlturaCelda(ctxMed, fila.valA, anchoColumna, fuente) + 12;
+            alturaCuerpo += medirAlturaCelda(ctxMed, fila.valB, anchoColumna, fuente) + 12;
+          }
+        });
+      } else {
+        filas.forEach(function (fila) {
+          if (fila.tipo === 'full') {
+            alturaCuerpo += medirAlturaCelda(ctxMed, fila.valor, ANCHO_UTIL, fuente) + ESPACIO_CELDA;
+          } else {
+            alturaCuerpo += Math.max(
+              medirAlturaCelda(ctxMed, fila.valA, ANCHO_COL, fuente),
+              medirAlturaCelda(ctxMed, fila.valB, ANCHO_COL, fuente)
+            ) + ESPACIO_CELDA;
+          }
+        });
+      }
+
+      /* Altura del pie (ahora más compacto al ir en una sola línea) */
+      const alturaPie = estilo.pie ? 90 : 60;
+
+      /* Altura del bloque de servicio del negocio */
+      const neg = obtenerNegocioActivo();
+      let alturaServicio = 0;
+      let lineasServicio = [];
+      if (neg) {
+        ctxMed.font = 'bold 20px ' + fuente + ', sans-serif';
+        lineasServicio = envolverTexto(ctxMed, neg.servicio.toUpperCase(), W - 100);
+        lineasServicio = lineasServicio.slice(0, 2);
+        alturaServicio = lineasServicio.length * 22 + 20;
+      }
+
+      /* Constantes del layout inferior */
+      const BORDE_INFERIOR    = 20;
+      const SEPARACION_SERV   = 10;
+      const SEPARACION_QR     = 20;
+      const SEPARACION_CUERPO = 20;
+
+      /* Altura mínima necesaria */
+      let H;
+      if (esHorizontal) {
+        H = 720;
+      } else {
+        const alturaMinimaNecesaria =
+          ALTURA_ENCABEZADO +
+          alturaCuerpo +
+          SEPARACION_CUERPO +
+          TAM_QR_MINIMO +
+          SEPARACION_QR +
+          (alturaServicio > 0 ? alturaServicio + SEPARACION_SERV : 0) +
+          alturaPie +
+          BORDE_INFERIOR + 10;
+        H = Math.max(ALTURA_MINIMA, alturaMinimaNecesaria);
+      }
+
+      /* --------------------------------------------------------
+         FASE 2: DIBUJO
+         -------------------------------------------------------- */
+      cv.width = W;
+      cv.height = H;
+      const ctx = cv.getContext('2d');
+
+      /* Fondo y marco */
+      ctx.fillStyle = estilo.colorFondo;
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = estilo.colorCinta;
+      ctx.lineWidth = 6;
+      ctx.strokeRect(12, 12, W - 24, H - 24);
+
+      /* Encabezado */
+      ctx.fillStyle = estilo.colorCinta;
+      ctx.fillRect(15, 15, W - 30, 150);
+      if (estilo.mostrarLogo) dibujarLogoForma(ctx, 45, 45, 90, estilo);
+
+      const colorTituloEnc = colorDeContraste(estilo.colorCinta);
+      const xTitulo = estilo.mostrarLogo ? 160 : 45;
+
+      ctx.fillStyle = colorTituloEnc;
+      ctx.font = 'bold 44px ' + fuente + ', sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('OSTIKEC', xTitulo, 78);
+
+      ctx.fillStyle = estilo.colorAcento;
+      ctx.font = 'bold 20px ' + fuente + ', sans-serif';
+      ctx.fillText('TICKET/SERVICIO/FACTURA', xTitulo, 118);
+
+      /* Nombre del negocio en el encabezado */
+      if (neg) {
+        ctx.save();
+        ctx.fillStyle = colorTituloEnc;
+        ctx.font = 'bold 20px ' + fuente + ', sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'top';
+        const xDer = W - 45;
+        const lineasNom = envolverTexto(ctx, neg.nombre.toUpperCase(), 260);
+        let yNom = 40;
+        lineasNom.slice(0, 2).forEach(function (linea) {
+          ctx.fillText(linea, xDer, yNom);
+          yNom += 22;
+        });
+        ctx.restore();
+      }
+
+      /* Número correlativo arriba a la derecha */
+      const numeroTexto = (cfgCampos.numeracionActiva && numeroTicketActual !== null)
+        ? (cfgCampos.numeracionPrefijo || 'T-') + String(numeroTicketActual).padStart(4, '0')
+        : '';
+
+      if (numeroTexto) {
+        ctx.save();
+        ctx.fillStyle = estilo.colorAcento;
+        ctx.font = 'bold 20px ' + fuente + ', sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(numeroTexto, W - 45, 145);
+        ctx.restore();
+      }
+
+      /* Función auxiliar para dibujar el pie en una sola línea */
+      function dibujarPieLineaUnica(yBase) {
+        const textoEmit = 'EMITIDO';
+        const textoFecha = fechaHoraEmisionLocal();
+        const gap = 10;
+
+        /* Medimos los dos textos */
+        ctx.font = 'bold 14px ' + fuente + ', sans-serif';
+        const anchoEmit = ctx.measureText(textoEmit).width;
+        ctx.font = 'bold 24px ' + fuente + ', sans-serif';
+        const anchoFecha = ctx.measureText(textoFecha).width;
+
+        const anchoTotal = anchoEmit + gap + anchoFecha;
+        const xInicio = (W - anchoTotal) / 2;
+
+        /* EMITIDO */
+        ctx.fillStyle = '#64748b';
+        ctx.font = 'bold 14px ' + fuente + ', sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(textoEmit, xInicio, yBase);
+
+        /* Fecha */
+        ctx.fillStyle = estilo.colorCinta;
+        ctx.font = 'bold 24px ' + fuente + ', sans-serif';
+        ctx.fillText(textoFecha, xInicio + anchoEmit + gap, yBase);
+
+        /* Pie personalizado si existe */
+        if (estilo.pie) {
+          ctx.fillStyle = '#64748b';
+          ctx.font = 'bold 14px ' + fuente + ', sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(estilo.pie.toUpperCase(), W / 2, yBase + 26);
+        }
+      }
+
+      /* =========================================================
+         LAYOUT HORIZONTAL
+         ========================================================= */
+      if (esHorizontal) {
+        const anchoIzq = Math.floor(ANCHO_UTIL * 0.55);
+        const anchoDer = ANCHO_UTIL - anchoIzq - GAP_COL;
+        let yIzq = ALTURA_ENCABEZADO;
+
+        filas.forEach(function (fila) {
+          if (fila.tipo === 'full') {
+            yIzq += dibujarCeldaCompacta(ctx, fila.label, fila.valor, MARGEN, yIzq, anchoIzq, fuente) + 12;
+          } else {
+            yIzq += dibujarCeldaCompacta(ctx, fila.labelA, fila.valA, MARGEN, yIzq, anchoIzq, fuente) + 12;
+            yIzq += dibujarCeldaCompacta(ctx, fila.labelB, fila.valB, MARGEN, yIzq, anchoIzq, fuente) + 12;
+          }
+        });
+
+        /* QR */
+        const xQR = MARGEN + anchoIzq + GAP_COL;
+        const tamAjustado = Math.min(tamQRConfigurado, H - 240);
+        const yQR = ALTURA_ENCABEZADO;
+        dibujarQRCanvas(ctx, textoQR, xQR + (anchoDer - tamAjustado) / 2, yQR, tamAjustado);
+
+        /* Bloque inferior */
+        const yPieInicio = H - BORDE_INFERIOR - alturaPie;
+        const yServicioInicio = yPieInicio - (alturaServicio > 0 ? alturaServicio + SEPARACION_SERV : 0);
+
+        if (neg && lineasServicio.length > 0) {
+          ctx.save();
+          ctx.fillStyle = estilo.colorCinta;
+          ctx.font = 'bold 20px ' + fuente + ', sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          let yServ = yServicioInicio + 10;
+          lineasServicio.forEach(function (linea) {
+            ctx.fillText(linea, W / 2, yServ);
+            yServ += 22;
+          });
+          ctx.restore();
+        }
+
+        /* Separador + pie */
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(MARGEN, yPieInicio);
+        ctx.lineTo(W - MARGEN, yPieInicio);
+        ctx.stroke();
+
+        dibujarPieLineaUnica(yPieInicio + 24);
+      }
+      /* =========================================================
+         LAYOUT VERTICAL
+         ========================================================= */
+      else {
+        /* Bloque inferior de abajo hacia arriba */
+        const yPieInicio = H - BORDE_INFERIOR - alturaPie;
+        const yServicioInicio = yPieInicio - (alturaServicio > 0 ? alturaServicio + SEPARACION_SERV : 0);
+        const yQRLimiteInferior = yServicioInicio - SEPARACION_QR;
+
+        /* Cuerpo (arriba) */
+        let y = ALTURA_ENCABEZADO;
+        filas.forEach(function (fila) {
+          if (fila.tipo === 'full') {
+            y += dibujarCeldaCompacta(ctx, fila.label, fila.valor, MARGEN, y, ANCHO_UTIL, fuente) + ESPACIO_CELDA;
+          } else {
+            const hA = medirAlturaCelda(ctx, fila.valA, ANCHO_COL, fuente);
+            const hB = medirAlturaCelda(ctx, fila.valB, ANCHO_COL, fuente);
+            const hFila = Math.max(hA, hB);
+            dibujarCeldaCompacta(ctx, fila.labelA, fila.valA, MARGEN, y, ANCHO_COL, fuente);
+            dibujarCeldaCompacta(ctx, fila.labelB, fila.valB, MARGEN + ANCHO_COL + GAP_COL, y, ANCHO_COL, fuente);
+            y += hFila + ESPACIO_CELDA;
+          }
+        });
+        const yFinalCuerpo = y;
+
+        /* Separador */
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(MARGEN, yFinalCuerpo + 4);
+        ctx.lineTo(W - MARGEN, yFinalCuerpo + 4);
+        ctx.stroke();
+
+        /* QR entre el cuerpo y el bloque inferior */
+        const yQRInicio = yFinalCuerpo + SEPARACION_CUERPO;
+        const espacioQR = yQRLimiteInferior - yQRInicio;
+        let tamQRReal = Math.min(tamQRConfigurado, espacioQR);
+        if (tamQRReal < 100) tamQRReal = Math.max(80, espacioQR);
+        if (tamQRReal > espacioQR) tamQRReal = Math.max(80, espacioQR);
+
+        const xQR = (W - tamQRReal) / 2;
+        dibujarQRCanvas(ctx, textoQR, xQR, yQRInicio, tamQRReal);
+
+        /* Servicio del negocio (arriba del pie) */
+        if (neg && lineasServicio.length > 0) {
+          ctx.save();
+          ctx.fillStyle = estilo.colorCinta;
+          ctx.font = 'bold 20px ' + fuente + ', sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          let yServ = yServicioInicio + 10;
+          lineasServicio.forEach(function (linea) {
+            ctx.fillText(linea, W / 2, yServ);
+            yServ += 22;
+          });
+          ctx.restore();
+        }
+
+        /* Separador + pie */
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(MARGEN, yPieInicio);
+        ctx.lineTo(W - MARGEN, yPieInicio);
+        ctx.stroke();
+
+        dibujarPieLineaUnica(yPieInicio + 24);
+      }
+
+      /* Marca de agua */
+      if (estilo.marcaAgua && estilo.marcaAgua.trim()) {
+        ctx.save();
+        ctx.globalAlpha = 0.06;
+        ctx.fillStyle = estilo.colorCinta;
+        ctx.font = 'bold 80px ' + fuente + ', sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.translate(W / 2, H / 2);
+        ctx.rotate(-Math.PI / 6);
+        ctx.fillText(estilo.marcaAgua.toUpperCase(), 0, 0);
+        ctx.restore();
+      }
+    };
+  }
+
+    /* ============================================================
+     20. WRAPPERS DE RESULTADOS (con aviso de fecha)
+     ============================================================ */
+
+  /* Analiza la fecha "f" (DD/MM/AA) del ticket.
+     Devuelve uno de:
+       { ok: false, motivo: 'formato' }         → no parseable
+       { ok: false, motivo: 'rango' }           → parseable pero imposible
+       { ok: true, vencida: false, dias: n }    → vigente
+       { ok: true, vencida: true,  dias: n }    → vencida
+
+     El margen (margenDias) es el número de días de gracia permitidos
+     antes de considerar la fecha como vencida. Por defecto 1 día. */
+  function analizarVencimientoFecha(fechaStr, margenDias) {
+    if (!fechaStr || typeof fechaStr !== 'string') {
+      return { ok: false, motivo: 'formato' };
+    }
+    const partes = fechaStr.trim().split('/');
+    if (partes.length !== 3) {
+      return { ok: false, motivo: 'formato' };
+    }
+
+    const dia  = parseInt(partes[0], 10);
+    const mes  = parseInt(partes[1], 10) - 1;
+    let anio   = parseInt(partes[2], 10);
+
+    if (isNaN(dia) || isNaN(mes) || isNaN(anio)) {
+      return { ok: false, motivo: 'formato' };
+    }
+    if (anio < 100) anio += 2000;
+    if (mes < 0 || mes > 11 || dia < 1 || dia > 31) {
+      return { ok: false, motivo: 'rango' };
+    }
+
+    const fechaTicket = new Date(anio, mes, dia);
+    if (fechaTicket.getFullYear() !== anio ||
+        fechaTicket.getMonth() !== mes ||
+        fechaTicket.getDate() !== dia) {
+      return { ok: false, motivo: 'rango' };
+    }
+    fechaTicket.setHours(0, 0, 0, 0);
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    const diffMs   = hoy.getTime() - fechaTicket.getTime();
+    const diffDias = Math.round(diffMs / 86400000);
+    const margen   = (typeof margenDias === 'number') ? margenDias : 1;
+
+    return {
+      ok: true,
+      vencida: diffDias > margen,
+      dias: diffDias
+    };
+  }
+
+  /* Inserta o elimina el aviso de fecha junto al banner de resultado.
+     - Fecha ausente  → sin aviso
+     - Fecha inválida → "⚠ Ticket con fecha inválida"
+     - Fecha vencida  → "⚠ Ticket con fecha vencida"
+     - Fecha vigente  → sin aviso */
+  function renderAvisoFecha(contenedorId, datos) {
+    const idAviso = contenedorId + '_aviso_fecha';
+    const existente = document.getElementById(idAviso);
+    if (existente && existente.parentNode) {
+      existente.parentNode.removeChild(existente);
+    }
+
+    if (!datos || !datos.f) return;
+
+    const analisis = analizarVencimientoFecha(datos.f, 1);
+
+    let texto = null;
+    if (!analisis.ok) {
+      texto = '⚠ Ticket con fecha inválida';
+    } else if (analisis.vencida) {
+      texto = '⚠ Ticket con fecha vencida';
+    }
+
+    if (!texto) return;
+
+    const banner = document.getElementById(contenedorId);
+    if (!banner || !banner.parentNode) return;
+
+    const aviso = document.createElement('p');
+    aviso.id = idAviso;
+    aviso.textContent = texto;
+    aviso.style.cssText =
+      'background:#fff9e6;' +
+      'color:#7a5500;' +
+      'border-left:4px solid #f2a900;' +
+      'padding:10px 14px;' +
+      'border-radius:6px;' +
+      'font-size:13px;' +
+      'font-weight:700;' +
+      'margin:12px 0;' +
+      'text-align:center;' +
+      'line-height:1.4;';
+    banner.parentNode.insertBefore(aviso, banner.nextSibling);
+  }
+
+  (function () {
+    if (typeof window.mostrarResultadoValidacion !== 'function') return;
+    const original = window.mostrarResultadoValidacion;
+    window.mostrarResultadoValidacion = function (esValido, datos, error) {
+      if (esValido && datos) {
+        const tabla = document.getElementById('tablaDatos');
+        original.call(this, esValido, datos, error);
+        if (tabla) {
+          const filas = tabla.querySelectorAll('tr');
+          if (filas.length >= 5) {
+            filas[3].children[0].textContent = 'Campo 4';
+            filas[4].children[0].textContent = 'Campo 5';
+          }
+          if (datos.e) {
+            tabla.innerHTML += '<tr><td>Emitido por</td><td>' + datos.e + '</td></tr>';
+          }
+        }
+        renderAvisoFecha('bannerValidacion', datos);
+      } else {
+        original.call(this, esValido, datos, error);
+        renderAvisoFecha('bannerValidacion', null);
+      }
+    };
+  })();
+
+  (function () {
+    if (typeof window.mostrarResultadoValidador !== 'function') return;
+    const original = window.mostrarResultadoValidador;
+    window.mostrarResultadoValidador = function (resultado) {
+      const seguridad = leerSeguridad();
+      original.call(this, resultado);
+      if (resultado && resultado.valido && resultado.datos) {
+        const tabla = document.getElementById('tablaDatos3');
+        if (tabla) {
+          const filas = tabla.querySelectorAll('tr');
+          if (filas.length >= 5) {
+            filas[3].children[0].textContent = 'Campo 4';
+            filas[4].children[0].textContent = 'Campo 5';
+          }
+          if (!seguridad.modoCiego && resultado.datos.e) {
+            tabla.innerHTML += '<tr><td>Emitido por</td><td>' + resultado.datos.e + '</td></tr>';
+          }
+        }
+        renderAvisoFecha('bannerValidacion3', resultado.datos);
+      } else {
+        renderAvisoFecha('bannerValidacion3', null);
+        if (resultado && !resultado.valido) {
+          agregarFalloLog(resultado.error || 'Ticket inválido');
+        }
+      }
+    };
+  })();
+
+
+  /* ============================================================
+     21. WRAPPER DE construirContenidoQR (SOLO emisor)
+     ============================================================ */
+  (function () {
+    if (typeof window.construirContenidoQR !== 'function') return;
+    const original = window.construirContenidoQR;
+    window.construirContenidoQR = function (datos) {
+      try {
+        const sesion = JSON.parse(localStorage.getItem(CLAVE_SESION) || '{}');
+        if (sesion && sesion.tel) datos.e = sesion.tel;
+      } catch (err) {}
+      return original.call(this, datos);
+    };
+  })();
+
+  /* ============================================================
+     22. OJO DE LICENCIA
+     ============================================================ */
+  function inyectarOjoLicencia() {
+    if (document.getElementById('btnOjoLicencia')) return;
+    const input = document.getElementById('loginLicencia');
+    if (!input || !input.parentNode) return;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'btnOjoLicencia';
+    btn.className = 'btn-ojo-licencia';
+    btn.title = 'Mostrar u ocultar la licencia';
+
+    const SVG_OJO =
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>' +
+      '<circle cx="12" cy="12" r="3"/></svg>';
+    const SVG_OJO_TACHADO =
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>' +
+      '<line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+    btn.innerHTML = SVG_OJO;
+    input.parentNode.appendChild(btn);
+
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.innerHTML = SVG_OJO_TACHADO;
+      } else {
+        input.type = 'password';
+        btn.innerHTML = SVG_OJO;
+      }
+    });
+  }
+
+  /* ============================================================
+     23. CONFIRMACIÓN DE SALIDA
+     ============================================================ */
+  function crearModalConfirmSalida() {
+    if (document.getElementById('modalConfirmSalida')) return;
+    const modal = document.createElement('div');
+    modal.id = 'modalConfirmSalida';
+    modal.className = 'modal';
+    modal.innerHTML =
+      '<div class="modal-caja">' +
+        '<div class="modal-cabecera"><h3>Confirmar salida</h3></div>' +
+        '<div class="modal-cuerpo">' +
+          '<p class="confirm-texto">¿Confirmas que quieres volver a la pantalla inicial? ' +
+          'Debes conocer el número de teléfono y la licencia para poder hacerlo.</p>' +
+          '<div class="acciones" style="margin-top:0;">' +
+            '<button id="btnCancelarSalida" type="button" class="btn btn-secundario">Cancelar</button>' +
+            '<button id="btnAceptarSalida" type="button" class="btn btn-acento">Aceptar</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(modal);
+    document.getElementById('btnCancelarSalida').addEventListener('click', function () {
+      modal.classList.remove('visible');
+    });
+    document.getElementById('btnAceptarSalida').addEventListener('click', function () {
+      modal.classList.remove('visible');
+      if (typeof window.cerrarSesion === 'function') window.cerrarSesion();
+    });
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) modal.classList.remove('visible');
+    });
+  }
+  function abrirModalConfirmSalida() {
+    crearModalConfirmSalida();
+    document.getElementById('modalConfirmSalida').classList.add('visible');
+  }
+  function interceptarBotonesSalir() {
+    ['btnSalirCreador', 'btnSalirValidador'].forEach(function (idBoton) {
+      const btn = document.getElementById(idBoton);
+      if (!btn) return;
+      if (btn.dataset.salidaInterceptada === '1') return;
+      const clon = btn.cloneNode(true);
+      clon.dataset.salidaInterceptada = '1';
+      btn.parentNode.replaceChild(clon, btn);
+      clon.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        abrirModalConfirmSalida();
+      });
+    });
+  }
+
+  /* ============================================================
+     24. TÉRMINOS Y CONDICIONES
+     ============================================================ */
+  function crearModalTerminos() {
+    if (document.getElementById('modalTerminos')) return;
+    const modal = document.createElement('div');
+    modal.id = 'modalTerminos';
+    modal.className = 'modal';
+    modal.innerHTML =
+      '<div class="modal-caja">' +
+        '<div class="modal-cabecera"><h3>Términos y Condiciones</h3></div>' +
+        '<div class="modal-cuerpo">' +
+          '<div class="terminos-texto">' +
+            '<h4>1. Aceptación</h4>' +
+            '<p>Al instalar y utilizar OSTIKEC, usted acepta estos términos en su totalidad. Si no está de acuerdo, no utilice la aplicación.</p>' +
+            '<h4>2. Titularidad</h4>' +
+            '<p>OSTIKEC es una aplicación desarrollada y propiedad de Osmani Tito Corrioso (Grupo OSTICOR). Todos los derechos están reservados.</p>' +
+            '<h4>3. Uso autorizado</h4>' +
+            '<p>La aplicación se distribuye únicamente bajo licencia personal otorgada por el desarrollador. El número de teléfono, el número de licencia y cualquier credencial de acceso son estrictamente personales e intransferibles.</p>' +
+            '<h4>4. Prohibiciones</h4>' +
+            '<p>Queda terminantemente prohibido:</p>' +
+            '<ul>' +
+              '<li>Utilizar, copiar o distribuir la aplicación sin autorización expresa del desarrollador.</li>' +
+              '<li>Compartir la licencia o el número de teléfono con terceros.</li>' +
+              '<li>Realizar ingeniería inversa, modificar o redistribuir el software.</li>' +
+              '<li>Utilizar la aplicación para actividades ilícitas o fraudulentas.</li>' +
+            '</ul>' +
+            '<h4>5. Supervisión y bloqueo</h4>' +
+            '<p>El desarrollador podrá recibir informes periódicos sobre accesos y tickets generados. En caso de detectarse uso indebido, la licencia podrá ser revocada sin previo aviso y el dispositivo bloqueado de forma automática.</p>' +
+            '<h4>6. Datos</h4>' +
+            '<p>La aplicación almacena información localmente en su dispositivo y envía informes agregados al desarrollador. No se recopilan datos personales con fines publicitarios.</p>' +
+            '<h4>7. Responsabilidad</h4>' +
+            '<p>El desarrollador no se hace responsable de daños derivados del uso indebido de la aplicación, ni de la pérdida de datos por causas ajenas a su control.</p>' +
+            '<h4>8. Contacto</h4>' +
+            '<p>Para soporte, ampliación de licencia o denuncia de uso indebido: osmanitito94@zoho.com</p>' +
+            '<p style="margin-top:16px; font-weight:700; color:#16324f;">Al continuar utilizando OSTIKEC, usted reconoce haber leído y aceptado estos términos.</p>' +
+            '<p style="margin-top:14px; font-size:12px; color:#64748b; line-height:1.5;">Consulta también nuestra <a href="https://tito-corrioso.github.io/ostikec/privacidad.html" target="_blank" rel="noopener" style="color:#16324f; font-weight:700; text-decoration:underline;">Política de Privacidad</a>.</p>' +
+          '</div>' +
+          '<button id="btnAceptarTerminos" type="button" class="btn btn-acento" style="margin-top:16px;">Aceptar</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(modal);
+    document.getElementById('btnAceptarTerminos').addEventListener('click', function () {
+      modal.classList.remove('visible');
+    });
+  }
+  function abrirModalTerminos() {
+    crearModalTerminos();
+    document.getElementById('modalTerminos').classList.add('visible');
+  }
+  function inyectarAvisoTerminos() {
+    if (document.getElementById('terminosAviso')) return;
+    const loginWrap = document.querySelector('#pantallaLogin .login-wrap');
+    if (!loginWrap) return;
+    const subtitulos = loginWrap.querySelectorAll('p.subtitulo');
+    let copyrightEl = null;
+    subtitulos.forEach(function (el) {
+      if (el.textContent.indexOf('OSTICOR') !== -1) copyrightEl = el;
+    });
+    if (!copyrightEl) return;
+    const p = document.createElement('p');
+    p.id = 'terminosAviso';
+    p.className = 'terminos-aviso';
+    p.innerHTML = 'Al utilizar OSTIKEC aceptas los <a href="#" id="linkTerminos">Términos y Condiciones</a> y la <a href="https://tito-corrioso.github.io/ostikec/privacidad.html" target="_blank" rel="noopener">Política de Privacidad</a>';
+    copyrightEl.parentNode.insertBefore(p, copyrightEl.nextSibling);
+    document.getElementById('linkTerminos').addEventListener('click', function (e) {
+      e.preventDefault();
+      abrirModalTerminos();
+    });
+  }
+
+  /* ============================================================
+     25. MANUAL DE USO
+     ============================================================ */
+  function crearBotonManual() {
+    const barraDer = document.querySelector('#pantallaCreador .barra-der');
+    if (!barraDer) return;
+    if (document.getElementById('btnManual')) return;
+    const btn = document.createElement('button');
+    btn.id = 'btnManual';
+    btn.className = 'btn-icono';
+    btn.title = 'Manual de uso';
+    btn.innerHTML =
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>' +
+      '<path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>';
+    const btnNeg = document.getElementById('btnNegocios');
+    const ref = btnNeg || document.getElementById('btnAbrirLector');
+    if (ref) barraDer.insertBefore(btn, ref);
+    else barraDer.appendChild(btn);
+    btn.addEventListener('click', abrirModalManual);
+  }
+  function crearModalManual() {
+    if (document.getElementById('modalManual')) return;
+    const modal = document.createElement('div');
+    modal.id = 'modalManual';
+    modal.className = 'modal';
+    modal.innerHTML =
+      '<div class="modal-caja">' +
+        '<div class="modal-cabecera">' +
+          '<h3>Manual de uso</h3>' +
+          '<button id="btnCerrarManual" class="btn-cerrar">✕</button>' +
+        '</div>' +
+        '<div class="modal-cuerpo">' +
+        '<div class="manual-texto">' +
+            '<div class="manual-intro">OSTIKEC es mucho más que un generador de tickets con código QR. Es una herramienta diseñada para dar confianza a tus clientes y profesionalizar la operación de tu negocio, sin necesidad de internet y sin complicaciones técnicas.</div>' +
+
+            '<h4>1. Primeros pasos</h4>' +
+            '<ul>' +
+              '<li>Introduce tu número de teléfono y tu licencia en la pantalla inicial y pulsa "Entrar".</li>' +
+              '<li>El campo de la licencia está enmascarado. Puedes pulsar el ojo 👁 para verlo temporalmente y comprobar que lo escribiste bien.</li>' +
+              '<li>Si tienes una sesión guardada y el dispositivo no ha cambiado, la aplicación entra directamente sin pedirte los datos.</li>' +
+              '<li>Para cerrar sesión, pulsa el botón de salir ⏏. La app te pedirá confirmación antes de volver al inicio.</li>' +
+              '<li>Si pulsas sobre el título OSTIKEC verás información sobre la aplicación y el desarrollador.</li>' +
+            '</ul>' +
+
+            '<h4>2. Generar un ticket</h4>' +
+            '<ul>' +
+              '<li>Completa los datos: Fecha, Nombre, Teléfono y los dos campos configurables.</li>' +
+              '<li>Cada campo tiene una X a la derecha para borrarlo individualmente. El botón "Limpiar" borra todos de una vez.</li>' +
+              '<li>Pulsa "Crear Ostikec" y aparecerá el ticket con su código QR.</li>' +
+              '<li>Puedes descargarlo como imagen PNG o compartirlo por WhatsApp, Telegram, correo o cualquier aplicación del teléfono.</li>' +
+              '<li>Si tienes activada la numeración automática del ticket, cada uno llevará su correlativo (por ejemplo T-0001) en la esquina superior derecha. Ese número es solo visual: no viaja dentro del QR.</li>' +
+              '<li>Con el botón del lector ▦ también puedes leer un ticket existente para rellenar el formulario con sus datos.</li>' +
+            '</ul>' +
+
+            '<h4>3. Negocios y etiquetas personalizadas</h4>' +
+            '<ul>' +
+              '<li>Cada negocio puede tener su nombre, sus datos de servicio y sus propias etiquetas para los campos 4 y 5.</li>' +
+              '<li>Puedes guardar varios negocios y cambiar entre ellos con un toque desde el botón de la maleta 💼.</li>' +
+              '<li>Se pueden exportar e importar como archivo .json para pasarlos a otro dispositivo.</li>' +
+              '<li>Si eliges "Otro" como etiqueta, puedes escribir tu propio nombre de campo (máximo 20 caracteres).</li>' +
+              '<li>Los estilos del ticket, la auto-numeración y el historial se guardan por separado para cada negocio.</li>' +
+            '</ul>' +
+
+            '<h4>4. Validar un ticket</h4>' +
+            '<ul>' +
+              '<li>Con una licencia de tipo Validador, entra y pulsa "Escanear código QR".</li>' +
+              '<li>Apunta la cámara al código del ticket. También puedes subir una imagen desde la galería.</li>' +
+              '<li>La app verifica la firma digital y muestra los datos del ticket junto al teléfono del dispositivo que lo emitió.</li>' +
+              '<li>Si el ticket es auténtico, aparece un banner verde con "TICKET VÁLIDO".</li>' +
+              '<li>Si los datos fueron alterados, aparece un banner rojo con "TICKET NO VÁLIDO".</li>' +
+              '<li>Si el emisor activó el modo validador ciego, no verás el teléfono del emisor.</li>' +
+            '</ul>' +
+
+            '<h4>5. Verificación de fechas</h4>' +
+            '<p>Además de la firma digital, OSTIKEC revisa la fecha del ticket y avisa al validador en dos casos:</p>' +
+            '<ul>' +
+              '<li><b>Fecha vencida:</b> si la fecha del ticket es anterior al día actual con más de un día de margen, aparece el aviso "⚠ Ticket con fecha vencida". El ticket sigue siendo válido criptográficamente, pero el validador sabe que corresponde a un día ya pasado.</li>' +
+              '<li><b>Fecha inválida:</b> si el ticket tiene una fecha imposible (por ejemplo 22/22/22), aparece el aviso "⚠ Ticket con fecha inválida".</li>' +
+              '<li>El validador decide libremente si lo acepta según la situación.</li>' +
+            '</ul>' +
+
+            '<h4>6. Panel de opciones</h4>' +
+            '<p>El botón flotante ⚙ (esquina inferior izquierda del creador) abre el panel de configuración. Tiene seis secciones:</p>' +
+            '<ul>' +
+              '<li><b>🎨 Estilo del ticket:</b> colores de la cinta, del fondo y del acento. Plantillas base (Estándar, Factura, Evento, Recibo). Mostrar u ocultar el logo y su forma. Tamaño del QR. Orientación vertical u horizontal. Fuente. Pie personalizable. Marca de agua. Bloque de firma al pie. Vista previa en tiempo real.</li>' +
+              '<li><b>📋 Campos y datos:</b> activar los campos opcionales Correo, Dirección y Notas. Ocultar campos vacíos en el ticket. Numeración automática del ticket con su prefijo. Reinicio de la numeración por mes o por año. Auto-numeración de los campos 4 y 5 (ver sección 7).</li>' +
+              '<li><b>📊 Historial y estadísticas:</b> contadores por día, 7 días, mes y total. Gráfico de barras de los últimos 7 días. Lista de los últimos tickets con opción de duplicar y marcar como usados. Filtros por fecha, negocio, nombre y estado. Exportación a PDF y Excel. Borrado del historial.</li>' +
+              '<li><b>🔒 Seguridad:</b> modo validador ciego (oculta el teléfono del emisor al validador). Registro de intentos fallidos de validación. PIN del panel para proteger el acceso a las opciones, con recuperación mediante PIN maestro.</li>' +
+              '<li><b>🌙 Apariencia:</b> modo oscuro de la interfaz. El ticket generado siempre se dibuja con los colores elegidos en Estilo, sin importar el modo de la interfaz.</li>' +
+              '<li><b>💾 Respaldo:</b> exportar toda la configuración (negocios, etiquetas, estilos, historial, numeración, preferencias y contadores) a un archivo .json. Importar ese archivo para restaurarlo en este u otro dispositivo. La app avisa cuando han pasado 30 días sin respaldo.</li>' +
+            '</ul>' +
+
+            '<h4>7. Auto-numeración de los campos 4 y 5</h4>' +
+            '<p>Cada uno de los dos campos configurables puede numerarse automáticamente. Útil para asignar asientos, facturas o entradas correlativas.</p>' +
+            '<ul>' +
+              '<li>Activa la auto-numeración desde el panel, en la sección Campos y datos.</li>' +
+              '<li>Define la capacidad máxima (por ejemplo 45 asientos). Con 0 se entiende sin límite.</li>' +
+              '<li>Opcionalmente escribe un prefijo (por ejemplo A-).</li>' +
+              '<li>El campo del formulario se bloquea y muestra el siguiente número libre.</li>' +
+              '<li>Al emitir un ticket, el contador avanza solo.</li>' +
+              '<li>Al llegar al límite, el campo muestra "Capacidad agotada" y la app impide generar más tickets hasta que reinicies el contador o amplíes el límite.</li>' +
+              '<li>Desde el panel puedes reiniciar el contador cuando quieras.</li>' +
+              '<li>El contador es independiente para cada negocio y para cada campo.</li>' +
+            '</ul>' +
+
+            '<h4>8. Prueba gratuita</h4>' +
+            '<ul>' +
+              '<li>Antes de comprar una licencia puedes probar OSTIKEC con hasta 12 tickets sin coste.</li>' +
+              '<li>Los tickets generados en modo prueba llevan la marca de agua "DEMO" y el validador los reconoce con un banner amarillo "TICKET DE DEMOSTRACIÓN".</li>' +
+              '<li>Al agotar los 12 tickets se ocultan los botones de Negocios, Lector QR y Panel, y se te invita a adquirir la licencia.</li>' +
+              '<li>Tus datos, negocios, estilos y contadores se conservan al pasar a la versión con licencia.</li>' +
+            '</ul>' +
+
+            '<h4>9. Seguridad de la aplicación</h4>' +
+            '<p><b>Código QR firmado:</b> cada ticket lleva sus datos cifrados y firmados digitalmente. Si alguien intenta alterarlos, la validación fallará.</p>' +
+            '<p><b>Registro del emisor:</b> cada ticket guarda el teléfono del dispositivo que lo emitió. Al validarlo se muestra junto a los datos, salvo que el emisor haya activado el modo ciego.</p>' +
+            '<p><b>Verificación de fechas:</b> al validar, la app compara la fecha del ticket con la fecha actual y avisa si está vencida o es inválida.</p>' +
+            '<p><b>Supervisión periódica:</b> el desarrollador recibe informes periódicos de accesos y tickets generados. Si tu licencia es robada, será detectada.</p>' +
+            '<p><b>Revocación remota:</b> el desarrollador puede revocar cualquier licencia en cualquier momento. Si tu licencia es revocada o el dispositivo bloqueado, al intentar iniciar sesión verás una pantalla de "ACCESO BLOQUEADO" con el motivo.</p>' +
+            '<p><b>PIN del panel:</b> puedes proteger el acceso a las opciones con un PIN de 4 dígitos. Tras 3 intentos fallidos, el panel se bloquea durante 5 minutos. Si olvidas tu PIN, puedes recuperar el acceso con el PIN maestro que aparece en la sección Seguridad del propio panel.</p>' +
+
+            '<h4>10. Licencia personal</h4>' +
+            '<p>El número de teléfono y la licencia son personales e intransferibles. No los compartas con nadie. La aplicación queda vinculada a tu dispositivo.</p>' +
+
+            '<h4>11. Contacto</h4>' +
+            '<p>Soporte: <b>osmanitito94@zoho.com</b></p>' +
+            '<p>Canal oficial en Telegram: <b>t.me/+4atqFg3ymcpjNWFh</b></p>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(modal);
+    document.getElementById('btnCerrarManual').addEventListener('click', function () {
+      modal.classList.remove('visible');
+    });
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) modal.classList.remove('visible');
+    });
+  }
+  function abrirModalManual() {
+    crearModalManual();
+    document.getElementById('modalManual').classList.add('visible');
+  }
+
+  /* ============================================================
+     26. MENÚ FLOTANTE
+     ============================================================ */
+  function crearBotonFlotante() {
+    if (document.getElementById('btnFlotanteMenu')) return;
+    const btn = document.createElement('button');
+    btn.id = 'btnFlotanteMenu';
+    btn.className = 'btn-flotante-menu';
+    btn.title = 'Opciones';
+    btn.innerHTML =
+      '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<circle cx="12" cy="12" r="3"/>' +
+      '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+    document.body.appendChild(btn);
+    btn.addEventListener('click', abrirPanelFlotante);
+  }
+
+  function crearPanelFlotante() {
+    if (document.getElementById('panelFlotante')) return;
+    const fondo = document.createElement('div');
+    fondo.id = 'panelFlotanteFondo';
+    fondo.className = 'panel-flotante-fondo';
+    fondo.addEventListener('click', cerrarPanelFlotante);
+    document.body.appendChild(fondo);
+
+    const panel = document.createElement('div');
+    panel.id = 'panelFlotante';
+    panel.className = 'panel-flotante';
+    panel.innerHTML =
+      '<div class="panel-flotante-cabecera">' +
+        '<h3>Opciones</h3>' +
+        '<button id="btnCerrarPanel" class="panel-flotante-cerrar" type="button">✕</button>' +
+      '</div>' +
+      '<div class="panel-flotante-cuerpo" id="panelCuerpo"></div>';
+    document.body.appendChild(panel);
+    document.getElementById('btnCerrarPanel').addEventListener('click', cerrarPanelFlotante);
+    construirContenidoPanel();
+  }
+
+  function abrirPanelFlotante() {
+    crearPanelFlotante();
+    construirContenidoPanel();
+    document.getElementById('panelFlotanteFondo').classList.add('visible');
+    document.getElementById('panelFlotante').classList.add('visible');
+    setTimeout(function () {
+      const ultima = leerJSON(CLAVE_MENU_ESTADO, { abierta: '' });
+      if (ultima && ultima.abierta) {
+        const sec = document.querySelector('.panel-seccion[data-seccion="' + ultima.abierta + '"]');
+        if (sec) sec.classList.add('abierta');
+      }
+    }, 30);
+  }
+
+  function cerrarPanelFlotante() {
+    const f = document.getElementById('panelFlotanteFondo');
+    const p = document.getElementById('panelFlotante');
+    if (f) f.classList.remove('visible');
+    if (p) p.classList.remove('visible');
+  }
+
+  function refrescarPanelSiAbierto() {
+    const p = document.getElementById('panelFlotante');
+    if (p && p.classList.contains('visible')) construirContenidoPanel();
+  }
+
+  function instalarAcordeon() {
+    const secciones = document.querySelectorAll('.panel-seccion');
+    secciones.forEach(function (sec) {
+      const titulo = sec.querySelector('.panel-seccion-titulo');
+      if (!titulo || titulo.dataset.accInstalado === '1') return;
+      titulo.dataset.accInstalado = '1';
+      titulo.addEventListener('click', function () {
+        const estaAbierta = sec.classList.contains('abierta');
+        secciones.forEach(s => s.classList.remove('abierta'));
+        if (!estaAbierta) {
+          sec.classList.add('abierta');
+          guardarJSON(CLAVE_MENU_ESTADO, { abierta: sec.dataset.seccion });
+        } else {
+          guardarJSON(CLAVE_MENU_ESTADO, { abierta: '' });
+        }
+      });
+    });
+  }
+
+  /* ============================================================
+     27. CONSTRUCCIÓN DEL PANEL
+     ============================================================ */
+  function construirContenidoPanel() {
+    const cont = document.getElementById('panelCuerpo');
+    if (!cont) return;
+    cont.innerHTML =
+      construirSeccionEstilo() +
+      construirSeccionCampos() +
+      construirSeccionHistorial() +
+      construirSeccionSeguridad() +
+      construirSeccionApariencia() +
+      construirSeccionRespaldo();
+    instalarAcordeon();
+    instalarListenersPanel();
+    const ultima = leerJSON(CLAVE_MENU_ESTADO, { abierta: '' });
+    if (ultima && ultima.abierta) {
+      const sec = cont.querySelector('.panel-seccion[data-seccion="' + ultima.abierta + '"]');
+      if (sec) sec.classList.add('abierta');
+    }
+  }
+
+  function construirSeccionEstilo() {
+    const estilo = obtenerEstiloActual();
+    const paletaCinta = PALETA_CINTAS.map(c =>
+      '<button type="button" class="panel-color' + (c.hex === estilo.colorCinta ? ' activo' : '') +
+      '" data-color-cinta="' + c.hex + '" style="background:' + c.hex + ';" title="' + c.nombre + '"></button>'
+    ).join('');
+    const paletaFondo = PALETA_FONDOS.map(c =>
+      '<button type="button" class="panel-color' + (c.hex === estilo.colorFondo ? ' activo' : '') +
+      '" data-color-fondo="' + c.hex + '" style="background:' + c.hex + ';" title="' + c.nombre + '"></button>'
+    ).join('');
+    const paletaAcento = PALETA_ACENTOS.map(c =>
+      '<button type="button" class="panel-color' + (c.hex === estilo.colorAcento ? ' activo' : '') +
+      '" data-color-acento="' + c.hex + '" style="background:' + c.hex + ';" title="' + c.nombre + '"></button>'
+    ).join('');
+    const opcionesForma = ['circulo','cuadrado','hexagono'].map(f => {
+      const nombres = { circulo: 'Círculo', cuadrado: 'Cuadrado', hexagono: 'Hexágono' };
+      return '<option value="' + f + '"' + (estilo.formaLogo === f ? ' selected' : '') + '>' + nombres[f] + '</option>';
+    }).join('');
+    const opcionesTamQR = TAMANOS_QR.map(t =>
+      '<option value="' + t.valor + '"' + (estilo.tamanoQR === t.valor ? ' selected' : '') + '>' + t.nombre + '</option>'
+    ).join('');
+    const opcionesFuente = FUENTES_TICKET.map(f =>
+      '<option value="' + f + '"' + (estilo.fuente === f ? ' selected' : '') + '>' + f + '</option>'
+    ).join('');
+
+    return '' +
+      '<div class="panel-seccion" data-seccion="estilo">' +
+        '<div class="panel-seccion-titulo">🎨 Estilo del ticket <span class="flecha">▼</span></div>' +
+        '<div class="panel-seccion-cuerpo">' +
+          '<label class="panel-label">Color de la cinta superior</label>' +
+          '<div class="panel-paleta">' + paletaCinta + '</div>' +
+          '<label class="panel-label">Color del fondo</label>' +
+          '<div class="panel-paleta">' + paletaFondo + '</div>' +
+          '<label class="panel-label">Color del acento</label>' +
+          '<div class="panel-paleta">' + paletaAcento + '</div>' +
+          '<label class="panel-switch">Mostrar logo <input type="checkbox" id="chkMostrarLogo"' + (estilo.mostrarLogo ? ' checked' : '') + '></label>' +
+          '<label class="panel-label">Forma del logo</label>' +
+          '<select class="panel-select" id="selFormaLogo">' + opcionesForma + '</select>' +
+          '<label class="panel-label">Tamaño del QR</label>' +
+          '<select class="panel-select" id="selTamQR">' + opcionesTamQR + '</select>' +
+          '<label class="panel-label">Orientación</label>' +
+          '<select class="panel-select" id="selOrientacion">' +
+            '<option value="vertical"' + (estilo.orientacion === 'vertical' ? ' selected' : '') + '>Vertical</option>' +
+            '<option value="horizontal"' + (estilo.orientacion === 'horizontal' ? ' selected' : '') + '>Horizontal</option>' +
+          '</select>' +
+          '<label class="panel-label">Fuente</label>' +
+          '<select class="panel-select" id="selFuente">' + opcionesFuente + '</select>' +
+          '<label class="panel-label">Pie personalizable (máx. ' + MAX_PIE + ')</label>' +
+          '<input class="panel-input" id="inpPie" type="text" maxlength="' + MAX_PIE + '" value="' + (estilo.pie || '') + '" placeholder="Ej. Gracias por su compra">' +
+          '<label class="panel-label">Marca de agua (máx. ' + MAX_MARCA_AGUA + ')</label>' +
+          '<input class="panel-input" id="inpMarcaAgua" type="text" maxlength="' + MAX_MARCA_AGUA + '" value="' + (estilo.marcaAgua || '') + '" placeholder="Ej. COPIA">' +
+          '<div class="panel-fila">' +
+            '<button type="button" class="panel-btn panel-btn-acento" id="btnAplicarEstilo">Regenerar ticket</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+    function construirSeccionCampos() {
+    const cfg = leerCamposConfig();
+
+    /* --- Bloque reutilizable para cada campo auto-numerado --- */
+    function bloqueAuto(campo, label) {
+      const cfgAuto = leerAutoConfig(campo);
+      const contador = leerAutoContador(campo);
+      const limite = cfgAuto.limite || 0;
+      const agotado = cfgAuto.activo && limite > 0 && contador >= limite;
+
+      let estado;
+      if (!cfgAuto.activo) {
+        estado = '<span style="color:#94a3b8;">Auto-numeración desactivada</span>';
+      } else if (agotado) {
+        estado = '<span style="color:#991b1b;font-weight:700;">Emitidos: ' +
+          contador + ' / ' + limite + ' · AGOTADO</span>';
+      } else {
+        estado = 'Emitidos: ' + contador +
+          (limite > 0 ? ' / ' + limite : '') +
+          ' · Siguiente: ' + (cfgAuto.prefijo || '') + (contador + 1);
+      }
+
+      return '' +
+        '<div style="margin-top:14px;padding-top:12px;border-top:1px dashed #e2e8f0;">' +
+          '<label class="panel-label">' + label + '</label>' +
+          '<label class="panel-switch">Activar auto-numeración ' +
+            '<input type="checkbox" data-auto-activo="' + campo + '"' +
+              (cfgAuto.activo ? ' checked' : '') + '></label>' +
+          '<label class="panel-label">Capacidad máxima (0 = sin límite)</label>' +
+          '<input class="panel-input" type="tel" inputmode="numeric" ' +
+            'data-auto-limite="' + campo + '" value="' + (limite || 0) + '" placeholder="0">' +
+          '<label class="panel-label">Prefijo (opcional, máx. 6)</label>' +
+          '<input class="panel-input" type="text" maxlength="6" ' +
+            'data-auto-prefijo="' + campo + '" value="' +
+              (cfgAuto.prefijo || '').replace(/"/g, '&quot;') + '" placeholder="Ej. A-">' +
+          '<p data-auto-estado="' + campo + '" ' +
+            'style="font-size:11px;color:#64748b;margin:8px 0 0 0;line-height:1.4;">' +
+            estado + '</p>' +
+          '<div class="panel-fila" style="margin-top:8px;">' +
+            '<button type="button" class="panel-btn panel-btn-peligro" ' +
+              'data-auto-reiniciar="' + campo + '">Reiniciar contador</button>' +
+          '</div>' +
+        '</div>';
+    }
+
+    return '' +
+      '<div class="panel-seccion" data-seccion="campos">' +
+        '<div class="panel-seccion-titulo">📋 Campos y datos <span class="flecha">▼</span></div>' +
+        '<div class="panel-seccion-cuerpo">' +
+          '<label class="panel-switch">Campo Correo <input type="checkbox" id="chkCorreo"' + (cfg.activarCorreo ? ' checked' : '') + '></label>' +
+          '<label class="panel-switch">Campo Dirección <input type="checkbox" id="chkDireccion"' + (cfg.activarDireccion ? ' checked' : '') + '></label>' +
+          '<label class="panel-switch">Campo Notas <input type="checkbox" id="chkNotas"' + (cfg.activarNotas ? ' checked' : '') + '></label>' +
+          '<label class="panel-switch">Ocultar campos vacíos en el ticket <input type="checkbox" id="chkOcultarVacios"' + (cfg.ocultarVacios ? ' checked' : '') + '></label>' +
+          '<label class="panel-switch">Numeración automática del ticket <input type="checkbox" id="chkNumeracion"' + (cfg.numeracionActiva ? ' checked' : '') + '></label>' +
+          '<label class="panel-label">Prefijo de numeración</label>' +
+          '<input class="panel-input" id="inpPrefijo" type="text" maxlength="6" value="' + (cfg.numeracionPrefijo || 'T-') + '" placeholder="Ej. T-">' +
+          '<p style="font-size:11px;color:#64748b;margin:10px 0 0 0;">Los campos opcionales aparecen en el formulario y en el ticket. Nunca se incluyen en el código QR.</p>' +
+          bloqueAuto('a', 'Auto-numeración — Campo 4') +
+          bloqueAuto('i', 'Auto-numeración — Campo 5') +
+        '</div>' +
+      '</div>';
+  }
+
+  function construirSeccionHistorial() {
+    const historial = leerHistorial();
+    const total = historial.length;
+    const hoy = new Date();
+    const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()).getTime();
+    const inicioSemana = inicioHoy - 6 * 24 * 60 * 60 * 1000;
+    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).getTime();
+
+    let cHoy = 0, cSemana = 0, cMes = 0;
+    historial.forEach(function (h) {
+      const t = h.fecha ? new Date(h.fecha).getTime() : 0;
+      if (t >= inicioHoy) cHoy++;
+      if (t >= inicioSemana) cSemana++;
+      if (t >= inicioMes) cMes++;
+    });
+
+    const ultimos = historial.slice(-8).reverse();
+    const htmlUltimos = ultimos.length === 0
+      ? '<div class="panel-historial-vacio">Sin tickets registrados aún.</div>'
+      : ultimos.map(function (h, i) {
+          const idx = historial.length - 1 - i;
+          const fechaTxt = h.fecha ? new Date(h.fecha).toLocaleString('es-ES', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+          return '<div class="panel-historial-item">' +
+            '<span class="h-nombre">' + (h.n || '—') + '</span>' +
+            '<span class="h-fecha">' + fechaTxt + '</span>' +
+            '<button type="button" class="h-btn" data-duplicar="' + idx + '">Duplicar</button>' +
+          '</div>';
+        }).join('');
+
+    return '' +
+      '<div class="panel-seccion" data-seccion="historial">' +
+        '<div class="panel-seccion-titulo">📊 Historial y estadísticas <span class="flecha">▼</span></div>' +
+        '<div class="panel-seccion-cuerpo">' +
+          '<div class="panel-contadores">' +
+            '<div class="panel-contador"><div class="c-num">' + cHoy + '</div><div class="c-lbl">Hoy</div></div>' +
+            '<div class="panel-contador"><div class="c-num">' + cSemana + '</div><div class="c-lbl">7 días</div></div>' +
+            '<div class="panel-contador"><div class="c-num">' + cMes + '</div><div class="c-lbl">Mes</div></div>' +
+            '<div class="panel-contador"><div class="c-num">' + total + '</div><div class="c-lbl">Total</div></div>' +
+          '</div>' +
+          '<canvas class="panel-grafico" id="panelGrafico"></canvas>' +
+          '<label class="panel-label">Últimos tickets</label>' +
+          '<div class="panel-historial-lista">' + htmlUltimos + '</div>' +
+          '<div class="panel-fila">' +
+            '<button type="button" class="panel-btn panel-btn-secundario" id="btnExportarPDF">Exportar PDF</button>' +
+            '<button type="button" class="panel-btn panel-btn-acento" id="btnExportarExcel">Exportar Excel</button>' +
+          '</div>' +
+          '<div class="panel-fila">' +
+            '<button type="button" class="panel-btn panel-btn-peligro" id="btnBorrarHistorial">Borrar historial</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function construirSeccionSeguridad() {
+    const seg = leerSeguridad();
+    const log = leerLogFallos();
+    const htmlLog = log.length === 0
+      ? '<div class="panel-historial-vacio">Sin validaciones fallidas registradas.</div>'
+      : log.slice(-5).reverse().map(function (l) {
+          const fechaTxt = l.fecha ? new Date(l.fecha).toLocaleString('es-ES', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+          return '<div class="panel-historial-item"><span class="h-nombre">' + (l.motivo || '—') + '</span><span class="h-fecha">' + fechaTxt + '</span></div>';
+        }).join('');
+
+    return '' +
+      '<div class="panel-seccion" data-seccion="seguridad">' +
+        '<div class="panel-seccion-titulo">🔒 Seguridad <span class="flecha">▼</span></div>' +
+        '<div class="panel-seccion-cuerpo">' +
+          '<label class="panel-switch">Modo validador ciego <input type="checkbox" id="chkModoCiego"' + (seg.modoCiego ? ' checked' : '') + '></label>' +
+          '<p style="font-size:11px;color:#64748b;margin:6px 0 10px 0;">Si está activo, el validador no verá el teléfono del emisor.</p>' +
+          '<label class="panel-switch">Registrar intentos fallidos <input type="checkbox" id="chkLogFallos"' + (seg.logFallos ? ' checked' : '') + '></label>' +
+          '<label class="panel-label">Últimas validaciones fallidas</label>' +
+          '<div class="panel-historial-lista">' + htmlLog + '</div>' +
+          '<div class="panel-fila">' +
+            '<button type="button" class="panel-btn panel-btn-peligro" id="btnBorrarLog">Borrar registro</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function construirSeccionApariencia() {
+    const ap = leerApariencia();
+    return '' +
+      '<div class="panel-seccion" data-seccion="apariencia">' +
+        '<div class="panel-seccion-titulo">🌙 Apariencia <span class="flecha">▼</span></div>' +
+        '<div class="panel-seccion-cuerpo">' +
+          '<label class="panel-switch">Modo oscuro <input type="checkbox" id="chkModoOscuro"' + (ap.modoOscuro ? ' checked' : '') + '></label>' +
+          '<p style="font-size:11px;color:#64748b;margin:6px 0 0 0;">El modo oscuro solo afecta a la interfaz. El ticket generado siempre es claro.</p>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function construirSeccionRespaldo() {
+    return '' +
+      '<div class="panel-seccion" data-seccion="respaldo">' +
+        '<div class="panel-seccion-titulo">💾 Respaldo <span class="flecha">▼</span></div>' +
+        '<div class="panel-seccion-cuerpo">' +
+          '<p style="font-size:12px;color:#475569;margin:0 0 10px 0;">Exporta toda la configuración (negocios, etiquetas, estilos, historial y preferencias) a un solo archivo .json.</p>' +
+          '<div class="panel-fila">' +
+            '<button type="button" class="panel-btn panel-btn-primario" id="btnExportarConfig">Exportar todo</button>' +
+            '<button type="button" class="panel-btn panel-btn-acento" id="btnImportarConfig">Importar todo</button>' +
+          '</div>' +
+          '<input type="file" id="inputConfigFile" accept=".json" style="display:none">' +
+        '</div>' +
+      '</div>';
+  }
+
+  /* ============================================================
+     28. LISTENERS DEL PANEL
+     ============================================================ */
+  function instalarListenersPanel() {
+    document.querySelectorAll('[data-color-cinta]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        actualizarEstiloParcial({ colorCinta: this.dataset.colorCinta });
+        construirContenidoPanel();
+      });
+    });
+    document.querySelectorAll('[data-color-fondo]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        actualizarEstiloParcial({ colorFondo: this.dataset.colorFondo });
+        construirContenidoPanel();
+      });
+    });
+    document.querySelectorAll('[data-color-acento]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        actualizarEstiloParcial({ colorAcento: this.dataset.colorAcento });
+        construirContenidoPanel();
+      });
+    });
+    const chkLogo = document.getElementById('chkMostrarLogo');
+    if (chkLogo) chkLogo.addEventListener('change', function () {
+      actualizarEstiloParcial({ mostrarLogo: this.checked });
+    });
+    const selForma = document.getElementById('selFormaLogo');
+    if (selForma) selForma.addEventListener('change', function () {
+      actualizarEstiloParcial({ formaLogo: this.value });
+    });
+    const selQR = document.getElementById('selTamQR');
+    if (selQR) selQR.addEventListener('change', function () {
+      actualizarEstiloParcial({ tamanoQR: parseInt(this.value, 10) });
+    });
+    const selOrient = document.getElementById('selOrientacion');
+    if (selOrient) selOrient.addEventListener('change', function () {
+      actualizarEstiloParcial({ orientacion: this.value });
+    });
+    const selFuente = document.getElementById('selFuente');
+    if (selFuente) selFuente.addEventListener('change', function () {
+      actualizarEstiloParcial({ fuente: this.value });
+    });
+    const inpPie = document.getElementById('inpPie');
+    if (inpPie) inpPie.addEventListener('input', function () {
+      actualizarEstiloParcial({ pie: this.value });
+    });
+    const inpMarca = document.getElementById('inpMarcaAgua');
+    if (inpMarca) inpMarca.addEventListener('input', function () {
+      actualizarEstiloParcial({ marcaAgua: this.value });
+    });
+    const btnAplicar = document.getElementById('btnAplicarEstilo');
+    if (btnAplicar) btnAplicar.addEventListener('click', regenerarTicketVisible);
+
+    const chkCorreo = document.getElementById('chkCorreo');
+    if (chkCorreo) chkCorreo.addEventListener('change', function () {
+      const cfg = leerCamposConfig();
+      cfg.activarCorreo = this.checked;
+      guardarCamposConfig(cfg);
+      actualizarVisibilidadCamposOpcionales();
+    });
+    const chkDireccion = document.getElementById('chkDireccion');
+    if (chkDireccion) chkDireccion.addEventListener('change', function () {
+      const cfg = leerCamposConfig();
+      cfg.activarDireccion = this.checked;
+      guardarCamposConfig(cfg);
+      actualizarVisibilidadCamposOpcionales();
+    });
+    const chkNotas = document.getElementById('chkNotas');
+    if (chkNotas) chkNotas.addEventListener('change', function () {
+      const cfg = leerCamposConfig();
+      cfg.activarNotas = this.checked;
+      guardarCamposConfig(cfg);
+      actualizarVisibilidadCamposOpcionales();
+    });
+    const chkOcultar = document.getElementById('chkOcultarVacios');
+    if (chkOcultar) chkOcultar.addEventListener('change', function () {
+      const cfg = leerCamposConfig();
+      cfg.ocultarVacios = this.checked;
+      guardarCamposConfig(cfg);
+    });
+    const chkNum = document.getElementById('chkNumeracion');
+    if (chkNum) chkNum.addEventListener('change', function () {
+      const cfg = leerCamposConfig();
+      cfg.numeracionActiva = this.checked;
+      guardarCamposConfig(cfg);
+    });
+    const inpPrefijo = document.getElementById('inpPrefijo');
+    if (inpPrefijo) inpPrefijo.addEventListener('input', function () {
+      const cfg = leerCamposConfig();
+      cfg.numeracionPrefijo = this.value || 'T-';
+      guardarCamposConfig(cfg);
+    });
+
+    document.querySelectorAll('[data-duplicar]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        const idx = parseInt(this.dataset.duplicar, 10);
+        duplicarTicketDelHistorial(idx);
+      });
+    });
+    const btnPDF = document.getElementById('btnExportarPDF');
+    if (btnPDF) btnPDF.addEventListener('click', exportarHistorialPDF);
+    const btnXLS = document.getElementById('btnExportarExcel');
+    if (btnXLS) btnXLS.addEventListener('click', exportarHistorialExcel);
+    const btnBorrarHist = document.getElementById('btnBorrarHistorial');
+    if (btnBorrarHist) btnBorrarHist.addEventListener('click', function () {
+      if (confirm('¿Borrar todo el historial de tickets? Esta acción no se puede deshacer.')) {
+        guardarHistorial([]);
+        construirContenidoPanel();
+      }
+    });
+
+    const chkCiego = document.getElementById('chkModoCiego');
+    if (chkCiego) chkCiego.addEventListener('change', function () {
+      const s = leerSeguridad();
+      s.modoCiego = this.checked;
+      guardarSeguridad(s);
+    });
+    const chkLog = document.getElementById('chkLogFallos');
+    if (chkLog) chkLog.addEventListener('change', function () {
+      const s = leerSeguridad();
+      s.logFallos = this.checked;
+      guardarSeguridad(s);
+    });
+    const btnBorrarLog = document.getElementById('btnBorrarLog');
+    if (btnBorrarLog) btnBorrarLog.addEventListener('click', function () {
+      if (confirm('¿Borrar el registro de validaciones fallidas?')) {
+        guardarJSON(CLAVE_LOG_FALLOS, []);
+        construirContenidoPanel();
+      }
+    });
+
+    const chkOscuro = document.getElementById('chkModoOscuro');
+    if (chkOscuro) chkOscuro.addEventListener('change', function () {
+      const ap = leerApariencia();
+      ap.modoOscuro = this.checked;
+      guardarApariencia(ap);
+      aplicarModoOscuro();
+    });
+
+    const btnExpConfig = document.getElementById('btnExportarConfig');
+    if (btnExpConfig) btnExpConfig.addEventListener('click', exportarConfiguracionCompleta);
+    const btnImpConfig = document.getElementById('btnImportarConfig');
+    if (btnImpConfig) btnImpConfig.addEventListener('click', function () {
+      document.getElementById('inputConfigFile').click();
+    });
+    const inputConfig = document.getElementById('inputConfigFile');
+    if (inputConfig) inputConfig.addEventListener('change', function () {
+      if (this.files && this.files.length > 0) {
+        importarConfiguracionCompleta(this.files[0]);
+        this.value = '';
+      }
+    });
+
+        /* ---------- Auto-numeración: activar/desactivar ---------- */
+    document.querySelectorAll('[data-auto-activo]').forEach(function (chk) {
+      chk.addEventListener('change', function () {
+        const campo = this.dataset.autoActivo;
+        const cfg = leerAutoConfig(campo);
+        cfg.activo = this.checked;
+        guardarAutoConfig(campo, cfg);
+        aplicarAutoAFormulario();
+        construirContenidoPanel();
+      });
+    });
+
+    /* ---------- Auto-numeración: límite ---------- */
+    document.querySelectorAll('[data-auto-limite]').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        const campo = this.dataset.autoLimite;
+        const nuevo = Math.max(0, parseInt(this.value, 10) || 0);
+        const cfg = leerAutoConfig(campo);
+        const contadorActual = leerAutoContador(campo);
+
+        /* Regla 3.10: si el nuevo límite es menor que el contador actual,
+           avisar y pedir confirmación para reiniciar. */
+        if (nuevo > 0 && contadorActual > nuevo) {
+          if (!confirm('El contador actual (' + contadorActual +
+                       ') supera el nuevo límite (' + nuevo +
+                       '). ¿Reiniciar a 0?')) {
+            this.value = cfg.limite || 0;
+            return;
+          }
+          reiniciarAutoContador(campo);
+        }
+
+        cfg.limite = nuevo;
+        guardarAutoConfig(campo, cfg);
+        aplicarAutoAFormulario();
+        construirContenidoPanel();
+      });
+    });
+
+    /* ---------- Auto-numeración: prefijo ---------- */
+    document.querySelectorAll('[data-auto-prefijo]').forEach(function (inp) {
+      inp.addEventListener('input', function () {
+        const campo = this.dataset.autoPrefijo;
+        const cfg = leerAutoConfig(campo);
+        cfg.prefijo = this.value;
+        guardarAutoConfig(campo, cfg);
+        aplicarAutoAFormulario();
+      });
+    });
+
+    /* ---------- Auto-numeración: reiniciar contador ---------- */
+    document.querySelectorAll('[data-auto-reiniciar]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const campo = this.dataset.autoReiniciar;
+        const nombre = campo === 'a' ? 'Campo 4' : 'Campo 5';
+        if (!confirm('¿Reiniciar el contador de ' + nombre + ' a 0?')) return;
+        reiniciarAutoContador(campo);
+        aplicarAutoAFormulario();
+        construirContenidoPanel();
+      });
+    });
+
+    setTimeout(dibujarGraficoHistorial, 30);
+  }
+
+  /* ============================================================
+     29. OPERACIONES AUXILIARES DEL PANEL
+     ============================================================ */
+  function regenerarTicketVisible() {
+    const zona = document.getElementById('zonaResultado');
+    if (!zona || zona.classList.contains('oculto')) {
+      alert('No hay un ticket generado actualmente para regenerar.');
+      return;
+    }
+    const datos = {
+      f: (document.getElementById('inFecha') || {}).value ? document.getElementById('inFecha').value.trim() : '',
+      n: (document.getElementById('inNombre') || {}).value ? document.getElementById('inNombre').value.trim() : '',
+      t: (document.getElementById('inTelefono') || {}).value ? document.getElementById('inTelefono').value.trim() : '',
+      a: (document.getElementById('inAsiento') || {}).value ? document.getElementById('inAsiento').value.trim() : '',
+      i: (document.getElementById('inIdServicio') || {}).value ? document.getElementById('inIdServicio').value.trim() : ''
+    };
+    if (!datos.f || !datos.n || !datos.t || !datos.a || !datos.i) return;
+    try {
+      const textoQR = window.construirContenidoQR(datos);
+      window.dibujarTicket(datos, textoQR);
+    } catch (e) {
+      alert('No se pudo regenerar el ticket.');
+    }
+  }
+
+  function duplicarTicketDelHistorial(idx) {
+    const historial = leerHistorial();
+    if (idx < 0 || idx >= historial.length) return;
+    const h = historial[idx];
+
+    if (h.f) document.getElementById('inFecha').value = h.f;
+    if (h.n) document.getElementById('inNombre').value = h.n;
+    if (h.t) document.getElementById('inTelefono').value = h.t;
+
+    /* No sobrescribir los campos que tienen auto-numeración activa */
+    if (h.a && !leerAutoConfig('a').activo) {
+      document.getElementById('inAsiento').value = h.a;
+    }
+    if (h.i && !leerAutoConfig('i').activo) {
+      document.getElementById('inIdServicio').value = h.i;
+    }
+
+    /* No cambiamos el negocio activo al duplicar: el negocio activo es una
+       decisión del usuario. Si el ticket era de otro negocio, el usuario
+       puede cambiarlo manualmente antes de generar. Así la auto-numeración
+       del negocio actual se mantiene intacta. */
+    /* (Bloque eliminado intencionalmente.) */
+    /* if (h.negId) {
+      const existe = leerNegocios().some(n => n.id === h.negId);
+      if (existe) {
+        guardarActivoId(h.negId);
+        renderizarListaNegocios();
+        actualizarSelectoresEtiquetas();
+      }
+    } */
+
+    /* Re-aplicar auto por si el negocio cambió y con él los contadores */
+    aplicarAutoAFormulario();
+
+    cerrarPanelFlotante();
+    alert('Datos del ticket cargados en el formulario. Puedes editarlos o generar uno nuevo.');
+  }
+
+  function dibujarGraficoHistorial() {
+    const cv = document.getElementById('panelGrafico');
+    if (!cv) return;
+    const cont = cv.parentNode;
+    cv.width = cont.clientWidth || 320;
+    cv.height = 120;
+    const ctx = cv.getContext('2d');
+
+    const conteo = [];
+    const hoy = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const dia = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - i);
+      const inicio = dia.getTime();
+      const fin = inicio + 24 * 60 * 60 * 1000;
+      let c = 0;
+      leerHistorial().forEach(function (h) {
+        const t = h.fecha ? new Date(h.fecha).getTime() : 0;
+        if (t >= inicio && t < fin) c++;
+      });
+      conteo.push({ fecha: dia, cantidad: c });
+    }
+
+    const max = Math.max(1, ...conteo.map(c => c.cantidad));
+    const W = cv.width;
+    const H = cv.height;
+    const padX = 20;
+    const padY = 22;
+    const anchoBarra = (W - padX * 2) / 7 - 6;
+    const alturaMax = H - padY * 2;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
+
+    conteo.forEach(function (c, i) {
+      const x = padX + i * ((W - padX * 2) / 7) + 3;
+      const altura = (c.cantidad / max) * alturaMax;
+      const y = H - padY - altura;
+
+      ctx.fillStyle = c.cantidad > 0 ? '#16324f' : '#e2e8f0';
+      ctx.fillRect(x, y, anchoBarra, altura || 2);
+
+      if (c.cantidad > 0) {
+        ctx.fillStyle = '#16324f';
+        ctx.font = 'bold 11px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(String(c.cantidad), x + anchoBarra / 2, y - 2);
+      }
+      ctx.fillStyle = '#64748b';
+      ctx.font = 'bold 10px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      const dia = ['D','L','M','M','J','V','S'][c.fecha.getDay()];
+      ctx.fillText(dia, x + anchoBarra / 2, H - padY + 4);
+    });
+  }
+
+  /* ============================================================
+     30. EXPORTAR A PDF Y EXCEL
+     ============================================================ */
+  function exportarHistorialPDF() {
+    if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+      alert('La librería PDF no está disponible. Asegúrate de haber incluido jspdf.umd.min.js en el index.html.');
+      return;
+    }
+    const historial = leerHistorial();
+    if (historial.length === 0) {
+      alert('No hay tickets en el historial para exportar.');
+      return;
+    }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+    doc.setFillColor(22, 50, 79);
+    doc.rect(0, 0, 210, 30, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text('OSTIKEC', 14, 13);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Historial de tickets generados', 14, 20);
+
+    doc.setTextColor(50, 50, 50);
+    doc.setFontSize(9);
+    doc.text('Fecha de exportación: ' + fechaHoraExportacionLocal(), 14, 38);
+    doc.text('Total de tickets: ' + historial.length, 14, 43);
+
+    const startY = 52;
+    const rowH = 7;
+    const cols = [
+      { x: 14,  label: 'No. Ticket'      },
+      { x: 34,  label: 'Fecha Servicio'  },
+      { x: 58,  label: 'Nombre'          },
+      { x: 92,  label: 'Teléfono'        },
+      { x: 114, label: 'Campo 4'         },
+      { x: 134, label: 'Campo 5'         },
+      { x: 154, label: 'Negocio'         },
+      { x: 182, label: 'Emitido por'     }
+    ];
+
+    doc.setFillColor(240, 244, 248);
+    doc.rect(10, startY - 5, 190, rowH, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(22, 50, 79);
+    cols.forEach(c => doc.text(c.label, c.x, startY));
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 30, 30);
+    doc.setFontSize(7);
+    let y = startY + rowH;
+    const pageH = 280;
+
+    historial.forEach(function (h) {
+      if (y > pageH) { doc.addPage(); y = 20; }
+      const neg = h.negId ? (leerNegocios().find(n => n.id === h.negId) || {}).nombre || '—' : '—';
+      const fila = [
+        h.no  || '',
+        h.f   || '',
+        h.n   || '',
+        h.t   || '',
+        h.a   || '',
+        h.i   || '',
+        neg,
+        h.e   || ''
+      ];
+      const limites = [12, 14, 20, 12, 12, 12, 16, 14];
+      fila.forEach(function (valor, j) {
+        doc.text(String(valor).substring(0, limites[j]), cols[j].x, y);
+      });
+      doc.setDrawColor(230, 230, 230);
+      doc.line(10, y + 2, 200, y + 2);
+      y += rowH;
+    });
+
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.text('OSTIKEC © OSTICOR 2026 — Contacto: osmanitito94@zoho.com', 105, 290, { align: 'center' });
+
+    doc.save('ostikec_historial_' + Date.now() + '.pdf');
+  }
+
+  function exportarHistorialExcel() {
+    if (typeof window.XLSX === 'undefined') {
+      alert('La librería Excel no está disponible. Asegúrate de haber incluido xlsx.full.min.js en el index.html.');
+      return;
+    }
+    const historial = leerHistorial();
+    if (historial.length === 0) {
+      alert('No hay tickets en el historial para exportar.');
+      return;
+    }
+
+    const filas = [];
+    filas.push(['OSTIKEC — Historial de tickets generados']);
+    filas.push(['Fecha de exportación: ' + fechaHoraExportacionLocal()]);
+    filas.push(['Total de tickets: ' + historial.length]);
+    filas.push([]);
+    filas.push([
+      'No. Ticket',
+      'Fecha del Servicio',
+      'Nombre',
+      'Teléfono',
+      'Campo 4',
+      'Campo 5',
+      'Negocio',
+      'Emitido por'
+    ]);
+
+    historial.forEach(function (h) {
+      const neg = h.negId ? (leerNegocios().find(n => n.id === h.negId) || {}).nombre || '' : '';
+      filas.push([
+        h.no || '',
+        h.f  || '',
+        h.n  || '',
+        h.t  || '',
+        h.a  || '',
+        h.i  || '',
+        neg,
+        h.e  || ''
+      ]);
+    });
+
+    const ws1 = XLSX.utils.aoa_to_sheet(filas);
+    ws1['!cols'] = [
+      { wch: 14 }, { wch: 18 }, { wch: 24 }, { wch: 14 },
+      { wch: 14 }, { wch: 14 }, { wch: 24 }, { wch: 14 }
+    ];
+
+    const resumen = {};
+    historial.forEach(function (h) {
+      const neg = h.negId ? (leerNegocios().find(n => n.id === h.negId) || {}).nombre || 'Sin negocio' : 'Sin negocio';
+      resumen[neg] = (resumen[neg] || 0) + 1;
+    });
+    const filasResumen = [['Negocio', 'Tickets']];
+    Object.keys(resumen).forEach(k => filasResumen.push([k, resumen[k]]));
+    const ws2 = XLSX.utils.aoa_to_sheet(filasResumen);
+    ws2['!cols'] = [{ wch: 30 }, { wch: 10 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws1, 'Historial');
+    XLSX.utils.book_append_sheet(wb, ws2, 'Resumen');
+    XLSX.writeFile(wb, 'ostikec_historial_' + Date.now() + '.xlsx');
+  }
+
+  /* ============================================================
+     31. EXPORTAR / IMPORTAR CONFIGURACIÓN COMPLETA
+     ============================================================ */
+  function exportarConfiguracionCompleta() {
+    const paquete = {
+      firma: 'OSTIKEC_CONFIG',
+      version: 2,
+      fecha: new Date().toISOString(),
+      negocios: leerNegocios(),
+      negocioActivo: leerActivoId(),
+      etiquetas: leerMapaEtiquetas(),
+      estilos: leerMapaEstilos(),
+      historial: leerHistorial(),
+      numeracion: leerMapaNumeracion(),
+      seguridad: leerSeguridad(),
+      apariencia: leerApariencia(),
+      campos: leerCamposConfig(),
+      autoConfig: leerMapaAutoConfig(),
+      autoContador: leerMapaAutoContador()
+    };
+    const json = JSON.stringify(paquete, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    descargarBlob(blob, 'ostikec_respaldo_' + Date.now() + '.json');
+  }
+
+  function importarConfiguracionCompleta(archivo) {
+    const lector = new FileReader();
+    lector.onload = function (e) {
+      let datos;
+      try { datos = JSON.parse(e.target.result); }
+      catch (err) { alert('El archivo no tiene un formato válido.'); return; }
+      if (!datos || datos.firma !== 'OSTIKEC_CONFIG') {
+        alert('El archivo no es un respaldo válido de OSTIKEC.');
+        return;
+      }
+      if (!confirm('¿Reemplazar TODA la configuración actual con la del respaldo? Se perderán los datos actuales.')) return;
+
+      if (Array.isArray(datos.negocios)) guardarNegocios(datos.negocios);
+      if (typeof datos.negocioActivo === 'string') guardarActivoId(datos.negocioActivo);
+      if (datos.etiquetas) guardarMapaEtiquetas(datos.etiquetas);
+      if (datos.estilos) guardarMapaEstilos(datos.estilos);
+      if (Array.isArray(datos.historial)) guardarHistorial(datos.historial);
+      if (datos.numeracion) guardarMapaNumeracion(datos.numeracion);
+      if (datos.seguridad) guardarSeguridad(datos.seguridad);
+      if (datos.apariencia) { guardarApariencia(datos.apariencia); aplicarModoOscuro(); }
+            if (datos.campos) guardarCamposConfig(datos.campos);
+      if (datos.autoConfig) guardarJSON(CLAVE_AUTO_CONFIG, datos.autoConfig);
+      if (datos.autoContador) guardarJSON(CLAVE_AUTO_CONTADOR, datos.autoContador);
+
+      renderizarListaNegocios();
+      actualizarSelectoresEtiquetas();
+      actualizarVisibilidadCamposOpcionales();
+      aplicarAutoAFormulario();
+      refrescarPanelSiAbierto();
+      alert('Configuración importada correctamente.');
+    };
+    lector.onerror = function () { alert('No se pudo leer el archivo.'); };
+    lector.readAsText(archivo);
+  }
+
+  /* ============================================================
+     32. INTERCEPTOR DEL BOTÓN CREAR
+     ============================================================ */
+  function instalarInterceptorBotonCrear() {
+    const btn = document.getElementById('btnCrear');
+    if (!btn) return;
+    if (btn.dataset.ostikecInterceptado === '1') return;
+
+    const clon = btn.cloneNode(true);
+    clon.dataset.ostikecInterceptado = '1';
+    btn.parentNode.replaceChild(clon, btn);
+
+    clon.addEventListener('click', function () {
+      /* --- Auto-numeración: bloquear si algún campo activo está agotado --- */
+      const camposAutoActivos = ['a', 'i'].filter(function (campo) {
+        return leerAutoConfig(campo).activo;
+      });
+
+      for (let k = 0; k < camposAutoActivos.length; k++) {
+        const campo = camposAutoActivos[k];
+        if (campoAutoAgotado(campo)) {
+          const nombre = campo === 'a' ? 'Campo 4' : 'Campo 5';
+          alert('Capacidad agotada en ' + nombre +
+                '. Reinicia el contador o amplía el límite en el panel.');
+          return;
+        }
+      }
+       const datos = {
+        f: (document.getElementById('inFecha') || {}).value ? document.getElementById('inFecha').value.trim() : '',
+        n: (document.getElementById('inNombre') || {}).value ? document.getElementById('inNombre').value.trim() : '',
+        t: (document.getElementById('inTelefono') || {}).value ? document.getElementById('inTelefono').value.trim() : '',
+        a: (document.getElementById('inAsiento') || {}).value ? document.getElementById('inAsiento').value.trim() : '',
+        i: (document.getElementById('inIdServicio') || {}).value ? document.getElementById('inIdServicio').value.trim() : ''
+      };
+
+      const esValido = datos.f && datos.n && datos.t && datos.a && datos.i;
+
+      let numeroTexto = '';
+      if (esValido) {
+        const numCfg = leerCamposConfig();
+        if (numCfg.numeracionActiva) {
+          numeroTicketActual = siguienteNumero();
+          numeroTexto = (numCfg.numeracionPrefijo || 'T-') + String(numeroTicketActual).padStart(4, '0');
+        } else {
+          numeroTicketActual = null;
+        }
+      } else {
+        numeroTicketActual = null;
+      }
+
+     if (typeof window.generarTicket === 'function') {
+        window.generarTicket.call(this);
+      }
+
+      /* Si el trial está agotado, el wrapper de generarTicket no dibujó nada.
+         No agregamos al historial ni incrementamos contadores. */
+      const trialBloqueado = !!(window.OSTIKEC_TRIAL &&
+                                window.OSTIKEC_TRIAL.estaActivo &&
+                                window.OSTIKEC_TRIAL.estaActivo() &&
+                                window.OSTIKEC_TRIAL.leer &&
+                                window.OSTIKEC_TRIAL.leer() &&
+                                window.OSTIKEC_TRIAL.leer().agotada);
+      if (trialBloqueado) return;
+
+      const zona = document.getElementById('zonaResultado');
+      const seMostro = zona && !zona.classList.contains('oculto');
+
+      if (esValido && seMostro) {
+        let emitidoPor = '';
+        try {
+          const sesion = JSON.parse(localStorage.getItem(CLAVE_SESION) || '{}');
+          if (sesion && sesion.tel) emitidoPor = sesion.tel;
+        } catch (e) {}
+          agregarAlHistorial({
+          fecha: new Date().toISOString(),
+          no: numeroTexto,
+          f: datos.f,
+          n: datos.n,
+          t: datos.t,
+          a: datos.a,
+          i: datos.i,
+          e: emitidoPor,
+          negId: leerActivoId()
+        });
+
+        /* --- Auto-numeración: incrementar contadores y refrescar inputs --- */
+        camposAutoActivos.forEach(function (campo) {
+          incrementarAutoContador(campo);
+        });
+        aplicarAutoAFormulario();
+
+        refrescarPanelSiAbierto();
+      }
+    });
+  }
+
+   /* ============================================================
+     32b. PIN MAESTRO DERIVADO DEL USUARIO
+     ----------------------------------------------------------------------------
+     Calcula el PIN maestro de recuperación para la sesión activa.
+     Se deriva de: teléfono + licencia + clave secreta.
+
+     La licencia se lee directamente de la sesión guardada (no del array
+     de usuarios, que ya no contiene la licencia en texto plano).
+     ============================================================ */
+  function calcularPinMaestroActual() {
+    try {
+      const sesion = JSON.parse(localStorage.getItem(CLAVE_SESION) || '{}');
+      if (!sesion || !sesion.tel || !sesion.licencia) return null;
+      const semilla = sesion.tel + sesion.licencia + CLAVE_SECRETA;
+      return sha256Hex(semilla).substring(0, 6).toUpperCase();
+    } catch (e) { return null; }
+  }
+
+  /* ============================================================
+     33. ARRANQUE
+     ============================================================ */
+  window.addEventListener('DOMContentLoaded', function () {
+
+    aplicarModoOscuro();
+
+    if (document.getElementById('pantallaLogin')) {
+      inyectarOjoLicencia();
+      inyectarAvisoTerminos();
+    }
+
+    if (document.getElementById('pantallaCreador') || document.getElementById('pantallaValidador')) {
+      instalarBotonInfo();
+    }
+
+    if (document.getElementById('pantallaCreador')) {
+      crearBotonNegocios();
+      crearModalNegocios();
+      crearBotonManual();
+      crearBotonFlotante();
+      instalarDibujarTicketPersonalizado();
+      inyectarCamposOpcionales();
+      actualizarSelectoresEtiquetas();
+      instalarInterceptorBotonCrear();
+
+      /* --- Auto-numeración: aplicar estado al formulario --- */
+      aplicarAutoAFormulario();
+
+      /* Re-aplicar tras limpiar campos (los listeners de index.html borran los valores; re-aplicamos el siguiente número después). */
+      document.querySelectorAll('.btn-limpiar-campo').forEach(function (b) {
+        if (b.dataset.autoLimpiarInstalado === '1') return;
+        b.dataset.autoLimpiarInstalado = '1';
+        b.addEventListener('click', function () {
+          setTimeout(aplicarAutoAFormulario, 10);
+        });
+      });
+
+      const btnLimpiarTodo = document.getElementById('btnLimpiar');
+      if (btnLimpiarTodo && btnLimpiarTodo.dataset.autoLimpiarTodoInstalado !== '1') {
+        btnLimpiarTodo.dataset.autoLimpiarTodoInstalado = '1';
+        btnLimpiarTodo.addEventListener('click', function () {
+          setTimeout(aplicarAutoAFormulario, 10);
+        });
+      }
+    }
+
+    interceptarBotonesSalir();
+
+    const pantallaCreador = document.getElementById('pantallaCreador');
+    if (pantallaCreador) {
+      const observer = new MutationObserver(function () {
+        if (pantallaCreador.classList.contains('activa') &&
+            pantallaCreador.style.display !== 'none') {
+          document.body.classList.add('creador-activo');
+        } else {
+          document.body.classList.remove('creador-activo');
+        }
+      });
+      observer.observe(pantallaCreador, { attributes: true, attributeFilter: ['class', 'style'] });
+      if (pantallaCreador.classList.contains('activa') &&
+          pantallaCreador.style.display !== 'none') {
+        document.body.classList.add('creador-activo');
+      }
+    }
+
+  });
+
+  /* ============================================================
+     34. API PÚBLICA PARA MÓDULOS EXTERNOS (extras2.js, etc.)
+     ============================================================ */
+  window.OSTIKEC = {
+    /* Claves de almacenamiento */
+    CLAVES: {
+      NEGOCIOS:       CLAVE_NEGOCIOS,
+      NEGOCIO_ACTIVO: CLAVE_NEGOCIO_ACTIVO,
+      ETIQUETAS:      CLAVE_ETIQUETAS,
+      SESION:         CLAVE_SESION,
+      ESTILO:         CLAVE_ESTILO,
+      HISTORIAL:      CLAVE_HISTORIAL,
+      NUMERACION:     CLAVE_NUMERACION,
+      SEGURIDAD:      CLAVE_SEGURIDAD,
+      APARIENCIA:     CLAVE_APARIENCIA,
+      MENU_ESTADO:    CLAVE_MENU_ESTADO,
+      LOG_FALLOS:     CLAVE_LOG_FALLOS,
+      CAMPOS_CONFIG:  CLAVE_CAMPOS_CONFIG
+    },
+
+    /* Utilidades generales */
+    leerJSON: leerJSON,
+    guardarJSON: guardarJSON,
+    descargarBlob: descargarBlob,
+    fechaHoraEmisionLocal: fechaHoraEmisionLocal,
+    fechaHoraExportacionLocal: fechaHoraExportacionLocal,
+    envolverTexto: envolverTexto,
+    sha256Hex: sha256Hex,
+    calcularPinMaestroActual: calcularPinMaestroActual,
+    colorDeContraste: colorDeContraste,
+
+    /* Negocios */
+    leerNegocios: leerNegocios,
+    guardarNegocios: guardarNegocios,
+    leerActivoId: leerActivoId,
+    guardarActivoId: guardarActivoId,
+    obtenerNegocioActivo: obtenerNegocioActivo,
+
+    /* Etiquetas */
+    leerMapaEtiquetas: leerMapaEtiquetas,
+    obtenerConfiguracionActual: obtenerConfiguracionActual,
+    obtenerLabelMostrable: obtenerLabelMostrable,
+
+    /* Estilo */
+    leerMapaEstilos: leerMapaEstilos,
+    obtenerEstiloActual: obtenerEstiloActual,
+    guardarEstiloActual: guardarEstiloActual,
+    actualizarEstiloParcial: actualizarEstiloParcial,
+
+    /* Historial */
+    leerHistorial: leerHistorial,
+    guardarHistorial: guardarHistorial,
+    agregarAlHistorial: agregarAlHistorial,
+    duplicarTicketDelHistorial: duplicarTicketDelHistorial,
+
+    /* Numeración */
+    leerMapaNumeracion: leerMapaNumeracion,
+    siguienteNumero: siguienteNumero,
+
+    /* Seguridad */
+    leerSeguridad: leerSeguridad,
+    guardarSeguridad: guardarSeguridad,
+
+    /* Apariencia */
+    leerApariencia: leerApariencia,
+    guardarApariencia: guardarApariencia,
+    aplicarModoOscuro: aplicarModoOscuro,
+
+    /* Campos */
+    leerCamposConfig: leerCamposConfig,
+    guardarCamposConfig: guardarCamposConfig,
+    actualizarVisibilidadCamposOpcionales: actualizarVisibilidadCamposOpcionales,
+    obtenerCamposOpcionales: obtenerCamposOpcionales,
+
+    /* Auto-numeración */
+    leerAutoConfig: leerAutoConfig,
+    guardarAutoConfig: guardarAutoConfig,
+    leerAutoContador: leerAutoContador,
+    guardarAutoContador: guardarAutoContador,
+    incrementarAutoContador: incrementarAutoContador,
+    reiniciarAutoContador: reiniciarAutoContador,
+    siguienteValorAuto: siguienteValorAuto,
+    campoAutoAgotado: campoAutoAgotado,
+    aplicarAutoAFormulario: aplicarAutoAFormulario,
+
+    /* Helpers de dibujo en canvas */
+    dibujarCeldaCompacta: dibujarCeldaCompacta,
+    medirAlturaCelda: medirAlturaCelda,
+    dibujarQRCanvas: dibujarQRCanvas,
+    dibujarLogoForma: dibujarLogoForma,
+
+    /* Panel */
+    construirContenidoPanel: construirContenidoPanel,
+    refrescarPanelSiAbierto: refrescarPanelSiAbierto,
+    abrirPanelFlotante: abrirPanelFlotante,
+    cerrarPanelFlotante: cerrarPanelFlotante,
+
+    /* Exportadores originales (sin filtro) */
+    exportarHistorialPDF: exportarHistorialPDF,
+    exportarHistorialExcel: exportarHistorialExcel,
+
+    /* Variable del número de ticket (con getter/setter) */
+    get numeroTicketActual() { return numeroTicketActual; },
+    set numeroTicketActual(v) { numeroTicketActual = v; },
+
+    /* Constantes de tamaño */
+    TAM_ETIQUETA: TAM_ETIQUETA,
+    TAM_VALOR: TAM_VALOR,
+    LINE_HEIGHT: LINE_HEIGHT,
+    ESPACIO_CELDA: ESPACIO_CELDA,
+    ALTURA_ENCABEZADO: ALTURA_ENCABEZADO,
+    ALTURA_MINIMA: ALTURA_MINIMA,
+    TAM_QR_MINIMO: TAM_QR_MINIMO,
+
+    /* Constantes de estilo */
+    ESTILO_POR_DEFECTO: ESTILO_POR_DEFECTO,
+    CAMPOS_CONFIG_DEFECTO: CAMPOS_CONFIG_DEFECTO,
+    OPCIONES_ETIQUETAS: OPCIONES_ETIQUETAS,
+    PALETA_CINTAS: PALETA_CINTAS,
+    PALETA_FONDOS: PALETA_FONDOS,
+    PALETA_ACENTOS: PALETA_ACENTOS,
+    FUENTES_TICKET: FUENTES_TICKET,
+    TAMANOS_QR: TAMANOS_QR,
+    MAX_PIE: MAX_PIE,
+    MAX_MARCA_AGUA: MAX_MARCA_AGUA,
+    MAX_OTRO: MAX_OTRO
+  };
+
+    /* ============================================================
+     35. TOUR DE BIENVENIDA AL CREADOR (versión general)
+     ============================================================
+     Se muestra la primera vez que el usuario entra al creador, tanto si
+     lo hace en modo prueba como si lo hace con licencia.
+
+     Comparte la clave 'ostikec_trial_tour_visto' con trial.js:
+       - Si el usuario ya vio el tour de trial, no ve este.
+       - Si el usuario ya vio este, no ve el de trial.
+       - Un solo tour por dispositivo, en cualquier modo.
+
+     Pasos:
+       1. Negocios
+       2. Lector QR
+       3. Formulario
+       4. Botón Crear
+       5. Botón flotante del panel (al avanzar, abre el panel)
+       6. Sección Estilo (dentro del panel)
+       7. Sección Campos y datos (dentro del panel)
+       8. Bloque de Auto-numeración del Campo 4 (dentro del panel, expandido)
+       9. Sección Historial
+      10. Sección Seguridad
+      11. Sección Apariencia
+      12. Sección Respaldo
+
+     El panel se eleva temporalmente por encima del overlay para que sea
+     visible y resaltable mientras dura el tour.
+     ============================================================ */
+  (function () {
+
+    const CLAVE_TOUR_CREADOR  = 'ostikec_trial_tour_visto';
+    const DELAY_INICIO_TOUR   = 1200;
+    const MARGEN_TOOLTIP      = 14;
+
+    let tourActivo       = false;
+    let elementoResaltado = null;
+    let overlayTour      = null;
+    let tooltipTour      = null;
+    let indiceActual     = 0;
+    let panelElevado     = false;
+
+    const PASOS = [
+      {
+        target: function () { return document.getElementById('btnNegocios'); },
+        titulo: 'Tus negocios y servicios',
+        texto: 'Aquí guardas los datos de cada negocio (nombre de la institución y servicio). ' +
+               'Puedes tener varios guardados y cambiar entre ellos con un toque.'
+      },
+      {
+        target: function () { return document.getElementById('btnAbrirLector'); },
+        titulo: 'Valida tickets con código QR',
+        texto: 'Pulsa aquí para escanear un ticket con la cámara o subir una imagen. ' +
+               'La app verificará si es auténtico y mostrará todos sus datos.'
+      },
+      {
+        target: function () {
+          return document.querySelector('#pantallaCreador .tarjeta .seccion-titulo');
+        },
+        titulo: 'Rellena los datos del cliente',
+        texto: 'Aquí escribes la fecha, el nombre, el teléfono y los dos campos configurables. ' +
+               'Es lo que aparecerá impreso en el ticket.'
+      },
+      {
+        target: function () { return document.getElementById('btnCrear'); },
+        titulo: 'Genera el ticket',
+        texto: 'Pulsa este botón para crear el ticket con su código QR. ' +
+               'Aparecerá justo debajo y podrás descargarlo o compartirlo.'
+      },
+      {
+        target: function () { return document.getElementById('btnFlotanteMenu'); },
+        titulo: 'Personaliza tu ticket',
+        texto: 'Este botón abre el panel de opciones. A continuación vamos a verlo ' +
+               'por dentro, sección por sección.',
+        abrirPanel: true
+      },
+      {
+        target: function () {
+          return document.querySelector('.panel-seccion[data-seccion="estilo"] .panel-seccion-titulo');
+        },
+        titulo: 'Estilo del ticket',
+        texto: 'Aquí eliges los colores, las plantillas base, el logo, la fuente, la orientación, ' +
+               'el tamaño del QR, el pie personalizable, la marca de agua y el bloque de firma.',
+        enPanel: true
+      },
+      {
+        target: function () {
+          return document.querySelector('.panel-seccion[data-seccion="campos"] .panel-seccion-titulo');
+        },
+        titulo: 'Campos y datos',
+        texto: 'Aquí activas los campos opcionales (Correo, Dirección, Notas), la numeración ' +
+               'automática del ticket y la auto-numeración de los campos 4 y 5.',
+        enPanel: true
+      },
+      {
+        target: function () {
+          const chk = document.querySelector('[data-auto-activo="a"]');
+          return chk ? chk.closest('div') : null;
+        },
+        titulo: 'Auto-numeración de los campos',
+        texto: 'Cuando activas la auto-numeración, el campo del formulario se bloquea y muestra ' +
+               'el siguiente número libre. Al llegar al límite, la app avisa "Capacidad agotada" ' +
+               'y permite reiniciar el contador desde aquí.',
+        enPanel: true,
+        abrirSeccion: 'campos'
+      },
+      {
+        target: function () {
+          return document.querySelector('.panel-seccion[data-seccion="historial"] .panel-seccion-titulo');
+        },
+        titulo: 'Historial y estadísticas',
+        texto: 'Contadores por día, semana, mes y total. Gráfico de barras de los últimos 7 días, ' +
+               'filtros por fecha, negocio, nombre y estado. Puedes exportar a PDF o Excel.',
+        enPanel: true
+      },
+      {
+        target: function () {
+          return document.querySelector('.panel-seccion[data-seccion="seguridad"] .panel-seccion-titulo');
+        },
+        titulo: 'Seguridad',
+        texto: 'Modo validador ciego, registro de intentos fallidos de validación y ' +
+               'PIN para proteger el acceso al panel con recuperación por PIN maestro.',
+        enPanel: true
+      },
+      {
+        target: function () {
+          return document.querySelector('.panel-seccion[data-seccion="apariencia"] .panel-seccion-titulo');
+        },
+        titulo: 'Apariencia',
+        texto: 'Modo oscuro de la interfaz. El ticket generado siempre se dibuja con los colores ' +
+               'elegidos en Estilo, sin importar el modo de la interfaz.',
+        enPanel: true
+      },
+      {
+        target: function () {
+          return document.querySelector('.panel-seccion[data-seccion="respaldo"] .panel-seccion-titulo');
+        },
+        titulo: 'Respaldo',
+        texto: 'Exporta toda tu configuración a un archivo .json o importa uno existente. ' +
+               'La app te avisa cuando han pasado 30 días sin hacer un respaldo.',
+        enPanel: true
+      }
+    ];
+
+    /* --------------------------------------------------------
+       Utilidades
+       -------------------------------------------------------- */
+    function esVisible(el) {
+      if (!el) return false;
+      const cs = window.getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    }
+
+    function expandirSeccion(nombreSeccion) {
+      const sec = document.querySelector('.panel-seccion[data-seccion="' + nombreSeccion + '"]');
+      if (!sec) return;
+      if (sec.classList.contains('abierta')) return;
+      const titulo = sec.querySelector('.panel-seccion-titulo');
+      if (titulo) titulo.click();
+    }
+
+    function elevarPanel() {
+      if (panelElevado) return;
+      const panel = document.getElementById('panelFlotante');
+      if (panel) {
+        panel.style.zIndex = '999999';
+        panelElevado = true;
+      }
+    }
+
+    function restaurarPanel() {
+      if (!panelElevado) return;
+      const panel = document.getElementById('panelFlotante');
+      if (panel) panel.style.zIndex = '';
+      panelElevado = false;
+    }
+
+    /* --------------------------------------------------------
+       Arranque del tour
+       -------------------------------------------------------- */
+    function comprobarYArrancar() {
+      if (localStorage.getItem(CLAVE_TOUR_CREADOR) === '1') return;
+      if (window.OSTIKEC_TRIAL && window.OSTIKEC_TRIAL.estaActivo()) return;
+      if (tourActivo) return;
+
+      const pantalla = document.getElementById('pantallaCreador');
+      if (!pantalla || !pantalla.classList.contains('activa')) return;
+      if (pantalla.style.display === 'none') return;
+
+      arrancarTour();
+    }
+
+    function arrancarTour() {
+      tourActivo = true;
+      indiceActual = 0;
+      crearEstructuraTour();
+      setTimeout(function () { mostrarPaso(0); }, 250);
+    }
+
+    /* --------------------------------------------------------
+       Estructura visual
+       -------------------------------------------------------- */
+    function crearEstructuraTour() {
+      if (overlayTour || tooltipTour) return;
+
+      overlayTour = document.createElement('div');
+      overlayTour.id = 'tourCreadorOverlay';
+      overlayTour.style.cssText =
+        'position:fixed;inset:0;z-index:999998;background:transparent;';
+      overlayTour.addEventListener('click', function (e) {
+        if (tooltipTour && tooltipTour.contains(e.target)) return;
+        avanzar();
+      });
+      document.body.appendChild(overlayTour);
+
+      tooltipTour = document.createElement('div');
+      tooltipTour.id = 'tourCreadorTooltip';
+      tooltipTour.style.cssText =
+        'position:fixed;z-index:1000000;background:#ffffff;' +
+        'border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,0.35);' +
+        'padding:18px 18px 14px 18px;max-width:320px;font-family:inherit;' +
+        'opacity:0;transition:opacity .25s;pointer-events:auto;';
+      document.body.appendChild(tooltipTour);
+    }
+
+    /* --------------------------------------------------------
+       Mostrar paso
+       -------------------------------------------------------- */
+    function mostrarPaso(idx) {
+      if (!tooltipTour) return;
+
+      if (idx >= PASOS.length) {
+        finalizar();
+        return;
+      }
+
+      indiceActual = idx;
+      const paso = PASOS[idx];
+      const target = paso.target();
+
+      if (!target || !esVisible(target)) {
+        mostrarPaso(idx + 1);
+        return;
+      }
+
+      /* Abrir el panel si el paso lo requiere */
+      if (paso.abrirPanel) {
+        if (typeof window.OSTIKEC.abrirPanelFlotante === 'function') {
+          window.OSTIKEC.abrirPanelFlotante();
+        }
+        /* Ocultar el fondo oscuro propio del panel: el overlay del tour hace ese papel */
+        const fondoPanel = document.getElementById('panelFlotanteFondo');
+        if (fondoPanel) fondoPanel.style.display = 'none';
+      }
+
+      /* Si el paso está dentro del panel, elevarlo para que se vea */
+      if (paso.enPanel) {
+        elevarPanel();
+        if (overlayTour) overlayTour.style.background = 'rgba(13, 32, 51, 0.78)';
+      } else {
+        restaurarPanel();
+        if (overlayTour) overlayTour.style.background = 'transparent';
+      }
+
+      /* Limpiar resaltado anterior */
+      if (elementoResaltado && elementoResaltado !== target) {
+        limpiarResaltado(elementoResaltado);
+      }
+      elementoResaltado = target;
+
+      /* Ocultar el tooltip mientras se reposiciona */
+      tooltipTour.style.opacity = '0';
+
+      /* Expandir la sección si el paso lo requiere */
+      if (paso.abrirSeccion) {
+        expandirSeccion(paso.abrirSeccion);
+        setTimeout(function () {
+          aplicarYPosicionar(target, idx, paso);
+        }, 320);
+      } else {
+        setTimeout(function () {
+          aplicarYPosicionar(target, idx, paso);
+        }, 80);
+      }
+    }
+
+    function aplicarYPosicionar(target, idx, paso) {
+      /* Hacer scroll al target si está fuera de la vista.
+         Si está dentro del panel, hacer scroll dentro del panel. */
+      const rect = target.getBoundingClientRect();
+      const visible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+      if (!visible) {
+        try { target.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch (e) {}
+      }
+
+      setTimeout(function () {
+        aplicarResaltado(target, paso.enPanel);
+        posicionarTooltip(target, idx, paso);
+      }, 60);
+    }
+
+    /* --------------------------------------------------------
+       Resaltado
+       -------------------------------------------------------- */
+    function aplicarResaltado(el, enPanel) {
+      try {
+        el.dataset.tourShadowPrev = JSON.stringify({
+          position:     el.style.position,
+          zIndex:       el.style.zIndex,
+          boxShadow:    el.style.boxShadow,
+          borderRadius: el.style.borderRadius,
+          outline:      el.style.outline,
+          outlineOffset: el.style.outlineOffset
+        });
+      } catch (e) {}
+
+      if (enPanel) {
+        /* Modo panel: borde amarillo, sin spotlight */
+        el.style.outline = '3px solid #f2a900';
+        el.style.outlineOffset = '3px';
+        el.style.borderRadius = '8px';
+      } else {
+        /* Modo normal: spotlight */
+        const cs = window.getComputedStyle(el);
+        if (cs.position === 'static') el.style.position = 'relative';
+        el.style.zIndex = '999999';
+        el.style.boxShadow = '0 0 0 9999px rgba(13, 32, 51, 0.78)';
+        el.style.borderRadius = '8px';
+      }
+    }
+
+    function limpiarResaltado(el) {
+      if (!el) return;
+      let prev = null;
+      try { prev = JSON.parse(el.dataset.tourShadowPrev || 'null'); } catch (e) {}
+      if (prev) {
+        el.style.position      = prev.position      || '';
+        el.style.zIndex        = prev.zIndex        || '';
+        el.style.boxShadow     = prev.boxShadow     || '';
+        el.style.borderRadius  = prev.borderRadius  || '';
+        el.style.outline       = prev.outline       || '';
+        el.style.outlineOffset = prev.outlineOffset || '';
+      } else {
+        el.style.position      = '';
+        el.style.zIndex        = '';
+        el.style.boxShadow     = '';
+        el.style.borderRadius  = '';
+        el.style.outline       = '';
+        el.style.outlineOffset = '';
+      }
+      delete el.dataset.tourShadowPrev;
+    }
+
+    /* --------------------------------------------------------
+       Tooltip
+       -------------------------------------------------------- */
+    function posicionarTooltip(target, idx, paso) {
+      const esUltimo = idx === PASOS.length - 1;
+
+      tooltipTour.innerHTML =
+        '<div style="font-size:11px;font-weight:700;color:#f2a900;' +
+          'text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">' +
+          'Paso ' + (idx + 1) + ' de ' + PASOS.length +
+        '</div>' +
+        '<h4 style="margin:0 0 8px 0;font-size:16px;color:#16324f;' +
+          'font-weight:800;letter-spacing:0.3px;line-height:1.3;">' + paso.titulo + '</h4>' +
+        '<p style="margin:0 0 14px 0;font-size:13px;color:#334155;line-height:1.55;">' +
+          paso.texto +
+        '</p>' +
+        '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center;">' +
+          '<button id="tourCreadorSaltar" type="button" ' +
+            'style="padding:8px 12px;border:none;background:transparent;' +
+            'color:#94a3b8;font-size:12px;font-weight:700;cursor:pointer;' +
+            'font-family:inherit;">Saltar</button>' +
+          '<button id="tourCreadorSiguiente" type="button" ' +
+            'style="padding:8px 18px;border:none;background:#16324f;' +
+            'color:#fff;border-radius:8px;font-size:13px;font-weight:700;' +
+            'cursor:pointer;font-family:inherit;">' +
+            (esUltimo ? 'Entendido' : 'Siguiente') +
+          '</button>' +
+        '</div>';
+
+      const rect  = target.getBoundingClientRect();
+      const tRect = tooltipTour.getBoundingClientRect();
+      const tW = tRect.width;
+      const tH = tRect.height;
+
+      let top  = rect.bottom + MARGEN_TOOLTIP;
+      let left = rect.left + (rect.width / 2) - (tW / 2);
+
+      if (top + tH > window.innerHeight - MARGEN_TOOLTIP) {
+        top = rect.top - tH - MARGEN_TOOLTIP;
+      }
+      if (top < MARGEN_TOOLTIP) top = MARGEN_TOOLTIP;
+      if (left < MARGEN_TOOLTIP) left = MARGEN_TOOLTIP;
+      if (left + tW > window.innerWidth - MARGEN_TOOLTIP) {
+        left = window.innerWidth - tW - MARGEN_TOOLTIP;
+      }
+
+      tooltipTour.style.top = top + 'px';
+      tooltipTour.style.left = left + 'px';
+      tooltipTour.style.opacity = '1';
+
+      const btnSaltar    = document.getElementById('tourCreadorSaltar');
+      const btnSiguiente = document.getElementById('tourCreadorSiguiente');
+      if (btnSaltar)    btnSaltar.addEventListener('click', finalizar);
+      if (btnSiguiente) btnSiguiente.addEventListener('click', avanzar);
+    }
+
+    /* --------------------------------------------------------
+       Avanzar / finalizar
+       -------------------------------------------------------- */
+    function avanzar() {
+      mostrarPaso(indiceActual + 1);
+    }
+
+    function finalizar() {
+      if (elementoResaltado) {
+        limpiarResaltado(elementoResaltado);
+        elementoResaltado = null;
+      }
+      if (overlayTour && overlayTour.parentNode) {
+        overlayTour.parentNode.removeChild(overlayTour);
+        overlayTour = null;
+      }
+      if (tooltipTour && tooltipTour.parentNode) {
+        tooltipTour.parentNode.removeChild(tooltipTour);
+        tooltipTour = null;
+      }
+      /* Restaurar el fondo oscuro del panel y su z-index */
+      const fondoPanel = document.getElementById('panelFlotanteFondo');
+      if (fondoPanel) fondoPanel.style.display = '';
+      restaurarPanel();
+
+      tourActivo = false;
+
+      try { localStorage.setItem(CLAVE_TOUR_CREADOR, '1'); } catch (e) {}
+    }
+
+    /* --------------------------------------------------------
+       Observador de entrada al creador
+       -------------------------------------------------------- */
+    function observarEntradaAlCreador() {
+      const pantalla = document.getElementById('pantallaCreador');
+      if (!pantalla) return;
+
+      const observer = new MutationObserver(function () {
+        const activa = pantalla.classList.contains('activa') &&
+                       pantalla.style.display !== 'none';
+        if (activa) {
+          setTimeout(comprobarYArrancar, DELAY_INICIO_TOUR);
+        }
+      });
+      observer.observe(pantalla, { attributes: true, attributeFilter: ['class', 'style'] });
+
+      /* Comprobar de inmediato por si ya estaba activa (sesión guardada) */
+      if (pantalla.classList.contains('activa') && pantalla.style.display !== 'none') {
+        setTimeout(comprobarYArrancar, DELAY_INICIO_TOUR);
+      }
+    }
+
+    /* --------------------------------------------------------
+       API pública del tour (opcional)
+       -------------------------------------------------------- */
+    window.OSTIKEC_TOUR = {
+      reset: function () {
+        try { localStorage.removeItem(CLAVE_TOUR_CREADOR); } catch (e) {}
+        console.log('Tour marcado para mostrarse de nuevo.');
+      },
+      arrancar: function () {
+        if (tourActivo) return;
+        if (typeof window.OSTIKEC.abrirPanelFlotante === 'function') {
+          // asegurar que el panel puede abrirse; no forzamos la apertura aquí
+        }
+        arrancarTour();
+      },
+      estaActivo: function () { return tourActivo; }
+    };
+
+    window.addEventListener('DOMContentLoaded', function () {
+      setTimeout(observarEntradaAlCreador, 200);
+    });
+
+  })();
+
+})();
