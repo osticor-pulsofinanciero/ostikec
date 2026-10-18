@@ -1014,13 +1014,27 @@ function obtenerSesionValida() {
     if (datos.huella !== huellaDispositivo()) return null;
     if (!datos.tel || !datos.licencia || !datos.tipo) return null;
 
-    /* Recalculamos el hash para verificar que la credencial sigue autorizada.
-       Comparamos en minúsculas para evitar problemas si algún hash se
-       pegó en el código con mayúsculas. */
     const hashEsperado = calcularHashCredencial(datos.tel, datos.licencia);
-    const sigueAutorizado = USUARIOS_AUTORIZADOS.some(
-      u => u.hashCred.toLowerCase() === hashEsperado && u.tipo === datos.tipo
-    );
+    const modLic = window.OSTIKEC_LICENCIAS;
+
+    let sigueAutorizado = false;
+
+    if (modLic && typeof modLic.verificar === 'function') {
+      const r = modLic.verificar(hashEsperado);
+      sigueAutorizado = !!(r && r.tipo === datos.tipo);
+    } else {
+      /* Fallback sin módulo: solo bootstrap */
+      try {
+        if (typeof USUARIOS_AUTORIZADOS !== 'undefined' &&
+            Array.isArray(USUARIOS_AUTORIZADOS)) {
+          sigueAutorizado = USUARIOS_AUTORIZADOS.some(function (u) {
+            return normHashDe(u.hashCred) === normHashDe(hashEsperado) &&
+                   u.tipo === datos.tipo;
+          });
+        }
+      } catch (e) { sigueAutorizado = false; }
+    }
+
     return sigueAutorizado ? datos : null;
   } catch (e) { return null; }
 }
@@ -1764,14 +1778,15 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 });
 </script>
+<script src="licencias.js?v=1"></script>
 <script src="jspdf.umd.min.js"></script>
 <script src="xlsx.full.min.js"></script>
-<script src="extras.js?v=13"></script>
-<script src="extras2.js?v=4"></script>
-<script src="panel.js?v=3"></script>
-<script src="trial.js?v=3"></script>
-<script src="update.js?v=3"></script>
-<script src="bloqueo.js?v=2"></script>
+<script src="extras.js?v=14"></script>
+<script src="extras2.js?v=14"></script>
+<script src="panel.js?v=14"></script>
+<script src="trial.js?v=14"></script>
+<script src="update.js?v=14"></script>
+<script src="bloqueo.js?v=14"></script>
 
 <!--<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
 <script>eruda.init();</script>-->
