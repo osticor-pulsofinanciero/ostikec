@@ -1,0 +1,2 @@
+# ostikec
+Sistema de Ticket. 
