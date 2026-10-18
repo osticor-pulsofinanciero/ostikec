@@ -1052,13 +1052,42 @@ function cerrarSesion() {
 /* Muestra un error en la pantalla de acceso */
 function mostrarErrorLogin(mensaje) {
   const caja = document.getElementById('loginError');
+  if (!caja) return;
+  caja.style.background = '';
+  caja.style.color = '';
   caja.textContent = mensaje;
   caja.classList.add('visible');
 }
 
+/* Variante para mensajes informativos (no de error):
+   fondo gris azulado, texto azul. Se usa durante la verificación en línea. */
+function mostrarInfoLogin(mensaje) {
+  const caja = document.getElementById('loginError');
+  if (!caja) return;
+  caja.style.background = '#eef2f7';
+  caja.style.color = '#16324f';
+  caja.textContent = mensaje;
+  caja.classList.add('visible');
+}
+
+/* Oculta el cuadro de mensaje y limpia estilos inline. */
+function ocultarMensajeLogin() {
+  const caja = document.getElementById('loginError');
+  if (!caja) return;
+  caja.classList.remove('visible');
+  caja.style.background = '';
+  caja.style.color = '';
+}
+
 /* Intenta entrar con los datos escritos en la pantalla de acceso.
    Calcula el hash de la credencial introducida y lo busca en la lista. */
+
+  /* Evita que dos clics rápidos lancen dos sincronizaciones en paralelo. */
+let loginEnProgreso = false;
+
 function intentarEntrar() {
+  if (loginEnProgreso) return;
+
   const telefono = normalizarTelefono(document.getElementById('loginTelefono').value);
   const licencia = document.getElementById('loginLicencia').value.trim().toUpperCase();
 
@@ -1067,24 +1096,82 @@ function intentarEntrar() {
     return;
   }
 
-  /* Calculamos el hash SHA-256 del par teléfono + licencia + salt.
-     El resultado está siempre en minúsculas. */
   const hashIntroducido = calcularHashCredencial(telefono, licencia);
 
-  /* Buscamos en la lista. Comparamos con .toLowerCase() para que dé igual
-     si el hash guardado está en mayúsculas o en minúsculas. */
-  const usuario = USUARIOS_AUTORIZADOS.find(
-    u => u.hashCred.toLowerCase() === hashIntroducido
-  );
+  /* ---- PASO 1: verificar localmente (bootstrap + cache) ---- */
+  let resultado = null;
+  const modLic = window.OSTIKEC_LICENCIAS;
 
-  if (!usuario) {
+  if (modLic && typeof modLic.verificar === 'function') {
+    resultado = modLic.verificar(hashIntroducido);
+  } else {
+    /* Fallback: solo bootstrap (sin módulo de licencias remotas) */
+    try {
+      if (typeof USUARIOS_AUTORIZADOS !== 'undefined' &&
+          Array.isArray(USUARIOS_AUTORIZADOS)) {
+        const u = USUARIOS_AUTORIZADOS.find(function (x) {
+          return normHashDe(x.hashCred) === normHashDe(hashIntroducido);
+        });
+        if (u) resultado = { tipo: u.tipo, origen: 'bootstrap' };
+      }
+    } catch (e) { /* sin bootstrap disponible */ }
+  }
+
+  if (resultado) {
+    ocultarMensajeLogin();
+    modoActual = resultado.tipo;
+    guardarSesion(telefono, licencia, resultado.tipo);
+    entrarAplicacion(resultado.tipo);
+    return;
+  }
+
+  /* ---- PASO 2: no está en local, intentar sincronizar ---- */
+  if (!modLic || typeof modLic.sincronizar !== 'function') {
     mostrarErrorLogin('Teléfono o licencia no autorizados.');
     return;
   }
 
-  modoActual = usuario.tipo;
-  guardarSesion(telefono, licencia, usuario.tipo);
-  entrarAplicacion(usuario.tipo);
+  /* Si sabemos que está offline, no perdemos 10 segundos en el fetch */
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    mostrarErrorLogin('Sin conexión. Conecta a internet e inténtalo de nuevo.');
+    return;
+  }
+
+  /* ---- PASO 3: sincronización + reintento ---- */
+  loginEnProgreso = true;
+  mostrarInfoLogin('Verificando licencia en línea…');
+
+  modLic.sincronizar().then(function (r) {
+    loginEnProgreso = false;
+
+    const resultado2 = modLic.verificar(hashIntroducido);
+
+    if (resultado2) {
+      ocultarMensajeLogin();
+      modoActual = resultado2.tipo;
+      guardarSesion(telefono, licencia, resultado2.tipo);
+      entrarAplicacion(resultado2.tipo);
+      return;
+    }
+
+    if (!r || !r.ok) {
+      mostrarErrorLogin(
+        'No se pudo verificar la licencia en línea. ' +
+        'Comprueba tu conexión e inténtalo de nuevo.'
+      );
+      return;
+    }
+
+    mostrarErrorLogin('Teléfono o licencia no autorizados.');
+  }).catch(function () {
+    loginEnProgreso = false;
+    mostrarErrorLogin('Error al verificar la licencia. Inténtalo de nuevo.');
+  });
+}
+
+/* Normaliza un hash para comparaciones: mayúsculas, sin espacios. */
+function normHashDe(h) {
+  return String(h || '').trim().toUpperCase();
 }
 
 /* Cambia de la pantalla de acceso a la pantalla según el tipo de licencia.
