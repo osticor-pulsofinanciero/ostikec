@@ -40,7 +40,7 @@
   /* ============================================================
      1. CONFIGURACIÓN
      ============================================================ */
-  const URL_LISTA_NEGRA = 'https://tito-corrioso.github.io/ostikec/blocked.json';
+  const URL_LISTA_NEGRA = 'https://osticor-pulsofinanciero.github.io/ostikec/blocked.json';
   const CLAVE_CACHE = 'ostikec_lista_negra';
 
   /* Longitud mínima de hash aceptada en comparaciones parciales.
@@ -165,7 +165,7 @@
         'Motivo: ' + (motivo || 'No especificado') +
       '</p>' +
       '<p style="font-size:12px; color:#64748b; margin:20px 0 0 0;">' +
-        'Contacto: osmanitito94@zoho.com' +
+        'Contacto: osticor.pulsofinanciero@gmail.com' +
       '</p>';
 
     document.body.appendChild(overlay);
