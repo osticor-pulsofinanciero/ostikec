@@ -18,7 +18,7 @@
   /* ============================================================
      1. CONFIGURACIÓN
      ============================================================ */
-  const URL_UPDATE           = 'https://tito-corrioso.github.io/ostikec/update.json';
+  const URL_UPDATE           = 'https://osticor-pulsofinanciero.github.io/ostikec/update.json';
   const CLAVE_ULTIMA_CONSULTA = 'ostikec_update_last_check';
   const CLAVE_YA_AVISADO      = 'ostikec_update_notified';
   const HORAS_ENTRE_CONSULTAS = 24;
