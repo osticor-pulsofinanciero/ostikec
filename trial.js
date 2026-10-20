@@ -674,14 +674,14 @@
             'Para seguir generando tickets, adquiere tu licencia personal. ' +
             'Tus datos, negocios y estilos se conservarán.' +
           '</p>' +
-          '<a href="https://t.me/+4atqFg3ymcpjNWFh" target="_blank" rel="noopener" ' +
+          '<a href="https://osticor-pulsofinanciero.github.io/" target="_blank" rel="noopener" ' +
             'style="display:block;padding:12px;background:#f2a900;color:#16324f;' +
             'border-radius:10px;font-weight:700;text-decoration:none;font-size:14px;' +
-            'margin-bottom:10px;">Solicitar licencia por Telegram</a>' +
-          '<a href="mailto:osmanitito94@zoho.com" ' +
+            'margin-bottom:10px;">Solicitar licencia en el sitio web</a>' +
+          '<a href="mailto:osticor.pulsofinanciero@gmail.com" ' +
             'style="display:block;padding:10px;background:#eef2f7;color:#16324f;' +
             'border-radius:10px;font-weight:700;text-decoration:none;font-size:13px;' +
-            'margin-bottom:10px;">Escribir a osmanitito94@zoho.com</a>' +
+            'margin-bottom:10px;">Escribir a osticor.pulsofinanciero@gmail.com</a>' +
           '<button id="btnVolverLogin" type="button" ' +
             'style="width:100%;padding:10px;background:#e2e8f0;color:#334155;' +
             'border:none;border-radius:10px;font-weight:700;font-size:13px;' +
