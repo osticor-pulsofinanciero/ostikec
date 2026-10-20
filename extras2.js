@@ -545,7 +545,7 @@
 
     doc.setFontSize(8);
     doc.setTextColor(120, 120, 120);
-    doc.text('OSTIKEC © OSTICOR 2026 — Contacto: osmanitito94@zoho.com',
+    doc.text('OSTIKEC © OSTICOR 2026 — Contacto: osticor.pulsofinanciero@gmail.com',
       105, 290, { align: 'center' });
 
     doc.save('ostikec_historial_' + Date.now() + '.pdf');
