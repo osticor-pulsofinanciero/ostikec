@@ -41,7 +41,7 @@
 
   /* Si true, el creador también registra sus escaneos como uso.
      Por defecto false: el creador solo consulta, no registra. */
-  const REGISTRAR_DESDE_CREADOR = false;
+  const REGISTRAR_DESDE_CREADOR = true;
 
   /* ============================================================
      UTILIDADES
