@@ -142,56 +142,68 @@
      5. PANTALLA DE BLOQUEO
      ============================================================ */
   function mostrarBloqueo(motivo) {
-    if (document.getElementById('pantallaBloqueo')) return;
-
-    const overlay = document.createElement('div');
-    overlay.id = 'pantallaBloqueo';
-    overlay.style.cssText =
-      'position:fixed; inset:0; z-index:99999; background:#0d2033; ' +
-      'display:flex; flex-direction:column; align-items:center; ' +
-      'justify-content:center; padding:30px; text-align:center; ' +
-      'font-family:Arial, sans-serif; color:#ffffff;';
-
-    overlay.innerHTML =
-      '<div style="font-size:60px; margin-bottom:20px;">🚫</div>' +
-      '<h1 style="font-size:22px; font-weight:800; margin:0 0 14px 0; color:#f2a900;">' +
-        'ACCESO BLOQUEADO' +
-      '</h1>' +
-      '<p style="font-size:14px; color:#9db4cc; margin:0 0 20px 0; line-height:1.5;">' +
-        'Esta licencia ha sido revocada o el dispositivo está bloqueado.<br>' +
-        'Contacte al administrador del sistema.' +
-      '</p>' +
-      '<p style="font-size:12px; color:#64748b; margin:0;">' +
-        'Motivo: ' + (motivo || 'No especificado') +
-      '</p>' +
-      '<p style="font-size:12px; color:#64748b; margin:20px 0 0 0;">' +
-        'Contacto: osticor.pulsofinanciero@gmail.com' +
-      '</p>';
-
-    document.body.appendChild(overlay);
-  }
+  if (document.getElementById('pantallaBloqueo')) return;
+  /* NUEVO: borrar la sesión para que un reload NO auto-entre */
+  try { localStorage.removeItem('ostikec_sesion'); } catch (e) {}
+  const overlay = document.createElement('div');
+  overlay.id = 'pantallaBloqueo';
+  overlay.style.cssText =
+    'position:fixed; inset:0; z-index:99999; background:#0d2033; ' +
+    'display:flex; flex-direction:column; align-items:center; ' +
+    'justify-content:center; padding:30px; text-align:center; ' +
+    'font-family:Arial, sans-serif; color:#ffffff;';
+  overlay.innerHTML =
+    '<div style="font-size:60px; margin-bottom:20px;">🚫</div>' +
+    '<h1 style="font-size:22px; font-weight:800; margin:0 0 14px 0; color:#f2a900;">' +
+      'ACCESO BLOQUEADO' +
+    '</h1>' +
+    '<p style="font-size:14px; color:#9db4cc; margin:0 0 20px 0; line-height:1.5;">' +
+      'Esta licencia ha sido revocada o el dispositivo está bloqueado.<br>' +
+      'Contacte al administrador del sistema.' +
+    '</p>' +
+    '<p style="font-size:12px; color:#64748b; margin:0;">' +
+      'Motivo: ' + (motivo || 'No especificado') +
+    '</p>' +
+    '<p style="font-size:12px; color:#64748b; margin:20px 0 0 0;">' +
+      'Contacto: osticor.pulsofinanciero@gmail.com' +
+    '</p>';
+  document.body.appendChild(overlay);
+}
 
   /* ============================================================
      6. INTERCEPTAR EL LOGIN PARA VERIFICAR
      ============================================================ */
   function verificarBloqueo() {
-    const telefono = document.getElementById('loginTelefono').value.trim();
-    const licencia = document.getElementById('loginLicencia').value.trim();
+  let telefono = document.getElementById('loginTelefono').value.trim();
+  let licencia = document.getElementById('loginLicencia').value.trim();
 
-    const bloqueo = estaBloqueado(telefono, licencia);
-
-    if (bloqueo) {
-      mostrarBloqueo(bloqueo.motivo || bloqueo.fecha || '');
-
-      ['pantallaCreador', 'pantallaValidador'].forEach(function (id) {
-        const el = document.getElementById(id);
-        if (el) {
-          el.classList.remove('activa');
-          el.style.display = 'none';
-        }
-      });
-    }
+  /* NUEVO: si los inputs están vacíos, leer la sesión guardada.
+     Esto cubre el caso de que la sesión se haya guardado antes de
+     que el bloqueo se active. */
+  if (!telefono || !licencia) {
+    try {
+      const sesion = JSON.parse(localStorage.getItem('ostikec_sesion') || '{}');
+      if (sesion && sesion.tel && sesion.licencia) {
+        telefono = sesion.tel;
+        licencia = sesion.licencia;
+      }
+    } catch (e) {}
   }
+
+  const bloqueo = estaBloqueado(telefono, licencia);
+
+  if (bloqueo) {
+    mostrarBloqueo(bloqueo.motivo || bloqueo.fecha || '');
+
+    ['pantallaCreador', 'pantallaValidador'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.classList.remove('activa');
+        el.style.display = 'none';
+      }
+    });
+  }
+}
 
   function instalarInterceptorLogin() {
     const btn = document.getElementById('btnEntrar');
