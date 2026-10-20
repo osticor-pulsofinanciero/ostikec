@@ -802,7 +802,7 @@
             '<p class="info-grupo">&copy; OSTICOR 2026</p>' +
             '<p class="info-derechos">Todos los derechos reservados</p>' +
             '<p class="info-aviso">No puede utilizar ni compartir la apk sin la licencia y la autorización del creador</p>' +
-            '<p class="info-contacto">Contacto: osmanitito94@zoho.com</p>' +
+            '<p class="info-contacto">Contacto: osticor.pulsofinanciero@gmail.com</p>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -1751,9 +1751,9 @@
             '<h4>7. Responsabilidad</h4>' +
             '<p>El desarrollador no se hace responsable de daños derivados del uso indebido de la aplicación, ni de la pérdida de datos por causas ajenas a su control.</p>' +
             '<h4>8. Contacto</h4>' +
-            '<p>Para soporte, ampliación de licencia o denuncia de uso indebido: osmanitito94@zoho.com</p>' +
+            '<p>Para soporte, ampliación de licencia o denuncia de uso indebido: osticor.pulsofinanciero@gmail.com</p>' +
             '<p style="margin-top:16px; font-weight:700; color:#16324f;">Al continuar utilizando OSTIKEC, usted reconoce haber leído y aceptado estos términos.</p>' +
-            '<p style="margin-top:14px; font-size:12px; color:#64748b; line-height:1.5;">Consulta también nuestra <a href="https://tito-corrioso.github.io/ostikec/privacidad.html" target="_blank" rel="noopener" style="color:#16324f; font-weight:700; text-decoration:underline;">Política de Privacidad</a>.</p>' +
+            '<p style="margin-top:14px; font-size:12px; color:#64748b; line-height:1.5;">Consulta también nuestra <a href="https://osticor-pulsofinanciero.github.io/ostikec/privacidad.html" target="_blank" rel="noopener" style="color:#16324f; font-weight:700; text-decoration:underline;">Política de Privacidad</a>.</p>' +
           '</div>' +
           '<button id="btnAceptarTerminos" type="button" class="btn btn-acento" style="margin-top:16px;">Aceptar</button>' +
         '</div>' +
@@ -1780,7 +1780,7 @@
     const p = document.createElement('p');
     p.id = 'terminosAviso';
     p.className = 'terminos-aviso';
-    p.innerHTML = 'Al utilizar OSTIKEC aceptas los <a href="#" id="linkTerminos">Términos y Condiciones</a> y la <a href="https://tito-corrioso.github.io/ostikec/privacidad.html" target="_blank" rel="noopener">Política de Privacidad</a>';
+    p.innerHTML = 'Al utilizar OSTIKEC aceptas los <a href="#" id="linkTerminos">Términos y Condiciones</a> y la <a href="https://osticor-pulsofinanciero.github.io/ostikec/privacidad.html" target="_blank" rel="noopener">Política de Privacidad</a>';
     copyrightEl.parentNode.insertBefore(p, copyrightEl.nextSibling);
     document.getElementById('linkTerminos').addEventListener('click', function (e) {
       e.preventDefault();
@@ -1915,8 +1915,8 @@
             '<p>El número de teléfono y la licencia son personales e intransferibles. No los compartas con nadie. La aplicación queda vinculada a tu dispositivo.</p>' +
 
             '<h4>11. Contacto</h4>' +
-            '<p>Soporte: <b>osmanitito94@zoho.com</b></p>' +
-            '<p>Canal oficial en Telegram: <b>t.me/+4atqFg3ymcpjNWFh</b></p>' +
+            '<p>Soporte: <b>osticor.pulsofinanciero@gmail.com</b></p>' +
+            '<p>Sito web oficial: <b>https://osticor-pulsofinanciero.github.io/</b></p>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -2686,7 +2686,7 @@
 
     doc.setFontSize(8);
     doc.setTextColor(120, 120, 120);
-    doc.text('OSTIKEC © OSTICOR 2026 — Contacto: osmanitito94@zoho.com', 105, 290, { align: 'center' });
+    doc.text('OSTIKEC © OSTICOR 2026 — Contacto: osticor.pulsofinanciero@gmail.com', 105, 290, { align: 'center' });
 
     doc.save('ostikec_historial_' + Date.now() + '.pdf');
   }
