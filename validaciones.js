@@ -36,7 +36,7 @@
      ============================================================ */
   const CLAVE_VALIDACIONES = 'ostikec_validaciones';
   const CLAVE_OCULTO       = 'ostikec_validaciones_oculto';
-  const VENTANA_USO_MS     = 24 * 60 * 60 * 1000;  // 24 horas
+  const VENTANA_USO_MS     = 20 * 60 * 60 * 1000;  // 20 horas
   const MAX_ENTRADAS       = 500;
 
   /* Si true, el creador también registra sus escaneos como uso.
@@ -210,7 +210,7 @@
              '&quot;Mostrar lista&quot; para verla.</div>';
     } else if (lista.length === 0) {
       html = '<div class="panel-historial-vacio">No hay tickets validados ' +
-             'en las últimas 24 horas.</div>';
+             'en las últimas 20 horas.</div>';
     } else {
       html = lista.map(renderItem).join('');
     }
@@ -269,7 +269,7 @@
       '<div class="tarjeta" id="' + idTarjeta + '" style="margin-top:16px;">' +
         '<h2 class="seccion-titulo">Tickets validados recientemente</h2>' +
         '<p class="mensaje-info" style="text-align:left;margin:0 0 12px 0;">' +
-          'Últimas 24 horas. Aquí puedes verificar los tickets validados ' +
+          'Últimas 20 horas. Aquí puedes verificar los tickets validados ' +
           'y detectar dobles usos.' +
         '</p>' +
         '<div class="valid-lista panel-historial-lista"></div>' +
