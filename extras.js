@@ -798,7 +798,7 @@
         '<div class="modal-cuerpo">' +
           '<div class="info-creador">' +
             '<p class="info-titulo">OSTIKEC</p>' +
-            '<p class="info-autor">Desarrollada por Osmani Tito Corrioso</p>' +
+            '<p class="info-autor">Desarrollada por OSTICOR Pulso Financiero</p>' +
             '<p class="info-grupo">&copy; OSTICOR 2026</p>' +
             '<p class="info-derechos">Todos los derechos reservados</p>' +
             '<p class="info-aviso">No puede utilizar ni compartir la apk sin la licencia y la autorización del creador</p>' +
@@ -1733,7 +1733,7 @@
             '<h4>1. Aceptación</h4>' +
             '<p>Al instalar y utilizar OSTIKEC, usted acepta estos términos en su totalidad. Si no está de acuerdo, no utilice la aplicación.</p>' +
             '<h4>2. Titularidad</h4>' +
-            '<p>OSTIKEC es una aplicación desarrollada y propiedad de Osmani Tito Corrioso (Grupo OSTICOR). Todos los derechos están reservados.</p>' +
+            '<p>OSTIKEC es una aplicación desarrollada y propiedad de OSTICOR Pulso Financiero. Todos los derechos están reservados.</p>' +
             '<h4>3. Uso autorizado</h4>' +
             '<p>La aplicación se distribuye únicamente bajo licencia personal otorgada por el desarrollador. El número de teléfono, el número de licencia y cualquier credencial de acceso son estrictamente personales e intransferibles.</p>' +
             '<h4>4. Prohibiciones</h4>' +
