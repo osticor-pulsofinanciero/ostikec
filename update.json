@@ -2,5 +2,5 @@
   "version": "27.00.01",
   "apk_url": "https://osticor-pulsofinanciero.github.io/ostikec/ostikec.apk",
   "changelog": "Mejoras de estabilidad y corrección de errores.",
-  "force_update": false
+  "force_update": true
 }
