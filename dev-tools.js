@@ -134,7 +134,7 @@
         '<summary style="cursor:pointer;font-weight:700;color:#16324f;font-size:13px;">🔑 Calculadora de hash de licencia</summary>' +
         '<div style="margin-top:12px;">' +
           '<label style="display:block;font-size:11px;font-weight:700;color:#475569;margin-bottom:4px;">Teléfono</label>' +
-          '<input id="devTelLic" type="tel" placeholder="54089688" style="width:100%;padding:8px;border:2px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">' +
+          '<input id="devTelLic" type="tel" placeholder="55005500" style="width:100%;padding:8px;border:2px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">' +
           '<label style="display:block;font-size:11px;font-weight:700;color:#475569;margin-bottom:4px;">Licencia</label>' +
           '<input id="devCodigoLic" type="text" placeholder="OT-C001-88-O" style="width:100%;padding:8px;border:2px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:10px;box-sizing:border-box;">' +
           '<button type="button" id="devCalcLic" style="width:100%;padding:10px;background:#16324f;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit;">Calcular hash</button>' +
@@ -152,9 +152,9 @@
         '<div style="margin-top:12px;">' +
           '<p style="font-size:11px;color:#475569;margin:0 0 10px 0;">Para usuarios que olvidaron ambos PINs. Introduce su teléfono y licencia (que él conoce). Opcionalmente su huella (del reporte de Telegram) para verificar.</p>' +
           '<label style="display:block;font-size:11px;font-weight:700;color:#475569;margin-bottom:4px;">Teléfono del usuario</label>' +
-          '<input id="devTelPin" type="tel" placeholder="54089688" style="width:100%;padding:8px;border:2px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">' +
+          '<input id="devTelPin" type="tel" placeholder="55005500" style="width:100%;padding:8px;border:2px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">' +
           '<label style="display:block;font-size:11px;font-weight:700;color:#475569;margin-bottom:4px;">Licencia del usuario</label>' +
-          '<input id="devLicPin" type="text" placeholder="OT-C001-88-O" style="width:100%;padding:8px;border:2px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">' +
+          '<input id="devLicPin" type="text" placeholder="XX-XYYY-YY-X" style="width:100%;padding:8px;border:2px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">' +
           '<label style="display:block;font-size:11px;font-weight:700;color:#475569;margin-bottom:4px;">Huella (opcional, solo para verificar)</label>' +
           '<input id="devHuellaPin" type="text" placeholder="a1b2c3d4e5f6a7b8" style="width:100%;padding:8px;border:2px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:10px;box-sizing:border-box;">' +
           '<label style="display:block;font-size:11px;font-weight:700;color:#475569;margin-bottom:4px;">Fórmula</label>' +
