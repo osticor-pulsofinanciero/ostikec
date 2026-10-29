@@ -176,7 +176,7 @@
           '<input id="devPinPersonal" type="tel" inputmode="numeric" maxlength="4" placeholder="••••" style="width:100%;padding:8px;border:2px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:6px;box-sizing:border-box;text-align:center;letter-spacing:8px;">' +
           '<button type="button" data-hash="pin" style="width:100%;padding:8px;background:#e2e8f0;color:#334155;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-family:inherit;font-size:12px;margin-bottom:8px;">Calcular hash del PIN personal</button>' +
           '<label style="display:block;font-size:11px;font-weight:700;color:#475569;margin:8px 0 4px 0;">JSON del ticket (para firma QR)</label>' +
-          '<textarea id="devJSONFirma" rows="3" style="width:100%;padding:8px;border:2px solid #cbd5e1;border-radius:8px;font-size:11px;font-family:monospace;margin-bottom:6px;box-sizing:border-box;">{"f":"15/10/26","n":"Prueba","t":"55555555","a":"A-1","i":"SVC-1","e":"54089688"}</textarea>' +
+          '<textarea id="devJSONFirma" rows="3" style="width:100%;padding:8px;border:2px solid #cbd5e1;border-radius:8px;font-size:11px;font-family:monospace;margin-bottom:6px;box-sizing:border-box;">{"f":"15/10/26","n":"Prueba","t":"55555555","a":"A-1","i":"SVC-1","e":"55005500"}</textarea>' +
           '<button type="button" data-hash="firma" style="width:100%;padding:8px;background:#e2e8f0;color:#334155;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-family:inherit;font-size:12px;margin-bottom:6px;">Calcular firma QR</button>' +
           '<div id="devResHash" style="margin-top:10px;font-size:12px;font-family:monospace;word-break:break-all;background:#f8fafc;padding:8px;border-radius:6px;display:none;"></div>' +
         '</div>' +
@@ -1031,7 +1031,7 @@
     if (!/^\d{2}\/\d{2}\/\d{2}$/.test(fecha)) { flash('Fecha inválida (DD/MM/AA)'); return; }
     if (typeof window.construirContenidoQR !== 'function') { flash('Función no disponible'); return; }
 
-    const datos = { f: fecha, n: nombre, t: '55555555', a: 'A-1', i: 'SVC-TEST', e: '54089688' };
+    const datos = { f: fecha, n: nombre, t: '55555555', a: 'A-1', i: 'SVC-TEST', e: '55005500' };
     if (demo) datos.demo = true;
 
     let qr;
@@ -1097,7 +1097,7 @@
       t: '55555555',
       a: 'A-1',
       i: 'SVC-' + Date.now(),
-      e: '54089688'
+      e: '55005500'
     };
     if (escenario === 'valido-viejo') datosBase.f = fechaVieja;
 
