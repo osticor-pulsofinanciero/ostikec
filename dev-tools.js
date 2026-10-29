@@ -182,8 +182,8 @@
         '</div>' +
       '</details>' +
 
-      /* 4. Diagnóstico de fallos */
-      '<details style="margin-bottom:10px;border:1px solid #e2e8f0;border-radius:8px;padding:10px;">' +
+      /* 4. Diagnóstico de fallos OJJJO: ahora esta oculto con display:none, eliminar esto ddl style si se quiere hacer visible, para mi esta sección no aporta mucho*/
+      '<details style="display:none;margin-bottom:10px;border:1px solid #e2e8f0;border-radius:8px;padding:10px;">' +
         '<summary style="cursor:pointer;font-weight:700;color:#991b1b;font-size:13px;">🐞 Diagnóstico del log de fallos</summary>' +
         '<div style="margin-top:12px;">' +
           '<p style="font-size:11px;color:#475569;margin:0 0 10px 0;">Diagnostica por qué las validaciones fallidas no se registran en el panel de Seguridad.</p>' +
