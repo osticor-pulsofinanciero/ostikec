@@ -1577,6 +1577,7 @@
       } else {
         original.call(this, esValido, datos, error);
         renderAvisoFecha('bannerValidacion', null);
+        agregarFalloLog(error || 'Ticket inválido');
       }
     };
   })();
