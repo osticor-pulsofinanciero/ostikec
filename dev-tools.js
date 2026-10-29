@@ -2,7 +2,7 @@
    DEV-TOOLS.JS — Herramientas de desarrollo de OSTIKEC (v2)
    ============================================================================
    
-   ⚠️ SOLO PARA LA VERSIÓN "OSTIKEC PRO" DEL DESARROLLADOR.
+   ⚠️ SOLO PARA LA VERSIÓN "OSTIKEC DEV" DEL DESARROLLADOR.
    NO incluir en el ZIP de la versión de usuarios.
    
    INSTALACIÓN:
@@ -127,7 +127,7 @@
     return '' +
     '<div class="tarjeta" id="' + ID_TARJETA + '" style="margin-top:16px;border:2px dashed #991b1b;">' +
       '<h2 class="seccion-titulo" style="color:#991b1b;border-bottom-color:#991b1b;">🛠️ Herramientas de desarrollo</h2>' +
-      '<p style="font-size:11px;color:#991b1b;margin:0 0 14px 0;font-weight:600;">Solo en OSTIKEC PRO (desarrollo). Nunca en el ZIP de usuarios.</p>' +
+      '<p style="font-size:11px;color:#991b1b;margin:0 0 14px 0;font-weight:600;">Solo en OSTIKEC DEV (desarrollo). Nunca en el ZIP de usuarios.</p>' +
 
       /* 1. Hash de licencia */
       '<details style="margin-bottom:10px;border:1px solid #e2e8f0;border-radius:8px;padding:10px;">' +
